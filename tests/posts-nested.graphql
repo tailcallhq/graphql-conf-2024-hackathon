@@ -1,0 +1,19 @@
+query {
+	posts {
+		id
+		title
+		body
+		user {
+			id
+			name
+			email
+			address {
+				zipcode
+				geo {
+					lat
+					lng
+				}
+			}
+		}
+	}
+}

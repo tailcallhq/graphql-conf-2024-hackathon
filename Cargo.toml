@@ -1,0 +1,16 @@
+[package]
+name = "hackathon"
+version = "0.1.0"
+edition = "2021"
+default-run = "hackathon"
+
+[dependencies]
+anyhow = "1.0.86"
+command-group = { version = "5.0.1", features = ["with-tokio"] }
+insta = { version = "1.39.0", features = ["json"] }
+mock_json = "0.1.8"
+reqwest = { version = "0.12.7", features = ["json"] }
+serde_json = "1.0.127"
+tokio = { version = "1.40.0", features = ["full"] }
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"

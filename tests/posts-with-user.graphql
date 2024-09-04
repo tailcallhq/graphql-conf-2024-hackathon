@@ -1,0 +1,12 @@
+query {
+	posts {
+		id
+		title
+		body
+		user {
+			id
+			name
+			email
+		}
+	}
+}
