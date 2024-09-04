@@ -34,5 +34,6 @@ async fn main() {
 
     if let Err(error) = run().await {
         error!("Critical error: {}", error);
+        panic!("Critical error");
     }
 }

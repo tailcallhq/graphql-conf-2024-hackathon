@@ -8,6 +8,22 @@ pub struct Command {
     command: tokio::process::Command,
 }
 
+pub struct CommandInstance {
+    child: AsyncGroupChild,
+}
+
+impl Drop for CommandInstance {
+    fn drop(&mut self) {
+        drop(self.child.start_kill())
+    }
+}
+
+impl From<AsyncGroupChild> for CommandInstance {
+    fn from(child: AsyncGroupChild) -> Self {
+        Self { child }
+    }
+}
+
 impl Command {
     pub fn from_path(cmd_path: &Path) -> Result<Self> {
         let name = cmd_path
@@ -37,15 +53,30 @@ impl Command {
         self.command.args(args);
     }
 
-    pub fn run(&mut self) -> Result<AsyncGroupChild> {
-        let mut command = self.command.group();
-
-        command.kill_on_drop(true);
-
+    pub fn run(&mut self) -> Result<CommandInstance> {
         info!("Output logs from setup script below");
 
-        let child = command.spawn()?;
+        let child = self.command.group_spawn()?;
 
-        Ok(child)
+        Ok(child.into())
+    }
+}
+
+impl CommandInstance {
+    pub async fn kill(mut self) -> Result<()> {
+        Ok(self.child.kill().await?)
+    }
+
+    pub async fn wait(&mut self) -> Result<()> {
+        let result = self.child.wait().await?;
+
+        if result.success() {
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "Process failed with exit code: {}",
+                result.code().unwrap_or(0)
+            ))
+        }
     }
 }

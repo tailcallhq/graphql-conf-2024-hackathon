@@ -1,9 +1,12 @@
 use anyhow::{anyhow, Result};
-use command_group::AsyncGroupChild;
 use std::{path::PathBuf, time::Duration};
 use tracing::{info, instrument};
 
-use crate::{command::Command, graphql_tests::run_graphql_tests, ROOT_DIR};
+use crate::{
+    command::{Command, CommandInstance},
+    graphql_tests::run_graphql_tests,
+    ROOT_DIR,
+};
 
 /// Runs tests and benchmarks for single project
 pub struct Project {
@@ -27,9 +30,9 @@ impl Project {
     pub async fn run_project(self) -> Result<()> {
         info!("Starting project: {}", &self.name);
 
-        // self.run_setup().await?;
-        let mut mock_server = self.run_mock_server().await?;
-        let mut server = self.run_server().await?;
+        self.run_setup().await?;
+        let mock_server = self.run_mock_server().await?;
+        let server = self.run_server().await?;
 
         run_graphql_tests().await?;
         self.run_benchmark().await?;
@@ -57,7 +60,7 @@ impl Project {
     }
 
     #[instrument(skip_all)]
-    async fn run_mock_server(&self) -> Result<AsyncGroupChild> {
+    async fn run_mock_server(&self) -> Result<CommandInstance> {
         info!("Starting mock server");
 
         let mut mock_path = PathBuf::from(ROOT_DIR);
@@ -73,13 +76,16 @@ impl Project {
     }
 
     #[instrument(skip_all)]
-    async fn run_server(&self) -> Result<AsyncGroupChild> {
+    async fn run_server(&self) -> Result<CommandInstance> {
         info!("Run run.sh");
         let mut run_path = self.path.clone();
         run_path.push("run.sh");
 
         let mut command = Command::from_path(&run_path)?;
         let command = command.run()?;
+
+        // TODO: wait for server with timeout instead of explicit timeout
+        tokio::time::sleep(Duration::from_secs(2)).await;
 
         Ok(command)
     }
