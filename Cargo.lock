@@ -230,6 +230,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "easy_retry"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b685bff3804033ed63c4354cc74d98f4f9fa5c6565669b2685c95c1d9078dfe8"
+dependencies = [
+ "futures",
+ "tokio",
+]
+
+[[package]]
 name = "encode_unicode"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -463,6 +473,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "command-group",
+ "easy_retry",
  "insta",
  "mock_json",
  "reqwest",
