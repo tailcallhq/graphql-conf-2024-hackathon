@@ -35,6 +35,7 @@ pub struct GeoData {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct PostData {
     pub id: String,
     pub title: String,
