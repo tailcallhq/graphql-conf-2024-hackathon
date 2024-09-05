@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use axum::{http::StatusCode, response::IntoResponse};
+use serde::Serialize;
 
 pub mod routes;
 
@@ -10,6 +11,7 @@ pub struct AppState {
     pub posts: HashMap<String, PostData>,
 }
 
+#[derive(Serialize, Clone)]
 pub struct UserData {
     pub id: i64,
     pub name: String,
@@ -20,16 +22,19 @@ pub struct UserData {
     pub address: AddressData,
 }
 
+#[derive(Clone, Serialize)]
 pub struct AddressData {
     pub geo: GeoData,
     pub zipcode: String,
 }
 
+#[derive(Clone, Serialize)]
 pub struct GeoData {
     pub lat: f64,
     pub lon: f64,
 }
 
+#[derive(Clone, Serialize)]
 pub struct PostData {
     pub id: String,
     pub title: String,
