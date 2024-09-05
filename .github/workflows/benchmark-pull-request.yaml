@@ -13,8 +13,8 @@ concurrency:
 jobs:
   benchmarks:
     name: Run benchmarks for pr
-    # runs-on: benchmarking-runner
-    runs-on: ubuntu-latest
+    if: "${{ contains(github.event.pull_request.labels.*.name, 'ci: benchmark') }}"
+    runs-on: benchmarking-runner
 
     steps:
       - uses: actions/checkout@v4
