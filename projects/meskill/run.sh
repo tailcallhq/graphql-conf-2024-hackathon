@@ -2,4 +2,6 @@
 
 set -e
 
+npm i
+
 node ./src/index.js
