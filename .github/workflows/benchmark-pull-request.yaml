@@ -3,7 +3,7 @@ name: Benchmark PR
 on:
   pull_request:
     paths: ["projects/**"]
-    types: [opened, reopened, edited, synchronize]
+    types: [opened, reopened, edited, synchronize, labeled]
     branches: [main]
 
 concurrency:
