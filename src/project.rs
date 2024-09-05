@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use std::{path::PathBuf, time::Duration};
+use tokio::{fs, io::AsyncWriteExt};
 use tracing::{info, instrument};
 
 use crate::{
@@ -99,9 +100,26 @@ impl Project {
 
         command.args(&["1"]);
 
-        let mut command = command.run()?;
+        let output = command.run_and_capture().await?;
 
-        command.wait().await?;
+        info!("Benchmark results:\n\n {}", String::from_utf8_lossy(&output.stdout));
+
+        let mut output_path = PathBuf::from(ROOT_DIR);
+        output_path.push("results");
+        output_path.push(&self.name);
+
+        fs::create_dir_all(&output_path).await?;
+
+        output_path.push("bench_1.out");
+
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(output_path)
+            .await?;
+
+        file.write_all(&output.stdout).await?;
 
         Ok(())
     }

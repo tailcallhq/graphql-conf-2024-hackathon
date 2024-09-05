@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    path::Path,
+    process::{Output, Stdio},
+};
 
 use anyhow::{anyhow, Result};
 use command_group::{AsyncCommandGroup, AsyncGroupChild};
@@ -59,6 +62,24 @@ impl Command {
         let child = self.command.group_spawn()?;
 
         Ok(child.into())
+    }
+
+    pub async fn run_and_capture(&mut self) -> Result<Output> {
+        info!("Run process in background and capture its output");
+
+        self.command.stdout(Stdio::piped());
+        self.command.stderr(Stdio::piped());
+
+        let output = self.command.group_output().await?;
+
+        if output.status.success() {
+            Ok(output)
+        } else {
+            Err(anyhow!(
+                "Process failed with exit code: {}",
+                output.status.code().unwrap_or(0)
+            ))
+        }
     }
 }
 
