@@ -2,4 +2,4 @@
 
 set -e
 
-npx json-server $1
+npx json-server -q $1

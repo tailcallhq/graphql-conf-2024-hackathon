@@ -3,7 +3,7 @@ name: Benchmark PR
 on:
   pull_request:
     paths: ["projects/**"]
-    types: [opened, reopened, edited, synchronize]
+    types: [opened, reopened, edited, synchronize, labeled]
     branches: [main]
 
 concurrency:
@@ -13,8 +13,8 @@ concurrency:
 jobs:
   benchmarks:
     name: Run benchmarks for pr
-    # runs-on: benchmarking-runner
-    runs-on: ubuntu-latest
+    if: "${{ contains(github.event.pull_request.labels.*.name, 'ci: benchmark') }}"
+    runs-on: benchmarking-runner
 
     steps:
       - uses: actions/checkout@v4
