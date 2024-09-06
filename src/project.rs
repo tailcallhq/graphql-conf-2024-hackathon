@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use easy_retry::EasyRetry;
 use std::{path::PathBuf, time::Duration};
 use tokio::{fs, io::AsyncWriteExt};
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 use crate::{
     command::{Command, CommandInstance},
@@ -102,7 +102,15 @@ impl Project {
 
                 result
             })
-            .await?;
+            .await
+            .map_err(|_| {
+                error!(
+                    "Failed to request `http://localhost:8000/graphql` after multiple attempts.
+    Please, verify your setup"
+                );
+
+                anyhow!("Server is not available")
+            })?;
 
         Ok(command)
     }
