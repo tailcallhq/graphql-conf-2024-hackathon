@@ -7,9 +7,9 @@ use crate::{AppError, AppState};
 
 pub async fn handle(state: State<Arc<AppState>>) -> Result<impl IntoResponse, AppError> {
     match state.db.reset() {
-        Ok(()) => Ok(Json(json!({"status": "database updated."}))),
+        Ok(()) => Ok(Json(json!({"status": "Database reset successfully"}))),
         Err(_e) => Err(AppError::InternalServerError(
-            "failed to update database".to_string(),
+            "Failed to reset database".to_string(),
         )),
     }
 }
