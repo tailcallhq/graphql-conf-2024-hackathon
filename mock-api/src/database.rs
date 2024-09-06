@@ -41,7 +41,7 @@ impl Database {
         }
     }
 
-    pub fn update(&self) -> Result<(), anyhow::Error> {
+    pub fn reset(&self) -> Result<(), anyhow::Error> {
         // clear the previous data from database.
         self.users
             .lock()
