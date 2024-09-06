@@ -6,6 +6,6 @@ use serde_json::json;
 use crate::{AppError, AppState};
 
 pub async fn handle(state: State<Arc<AppState>>) -> Result<impl IntoResponse, AppError> {
-    state.db.update()?;
+    let _ = state.db.update()?;
     Ok(Json(json!({})))
 }
