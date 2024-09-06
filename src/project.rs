@@ -7,10 +7,18 @@ use tracing::{error, info, instrument};
 use crate::{
     command::{Command, CommandInstance},
     graphql_tests::run_graphql_tests,
-    request::graphql_request,
+    request::{REFERENCE_GRAPHQL_CLIENT, TESTED_GRAPHQL_CLIENT},
     utils::env_default,
     ROOT_DIR,
 };
+
+static TEST_GRAPHQL_REQUEST: &str = "
+query {
+    user(id: 1) {
+        name
+    }
+}
+";
 
 /// Runs tests and benchmarks for single project
 pub struct Project {
@@ -35,6 +43,7 @@ impl Project {
         info!("Starting project: {}", &self.name);
 
         let mock_server = self.run_mock_server().await?;
+        let reference_server = self.run_reference_server().await?;
         let server = self.run_server().await?;
 
         run_graphql_tests().await?;
@@ -42,6 +51,7 @@ impl Project {
         run_graphql_tests().await?;
 
         mock_server.kill().await?;
+        reference_server.kill().await?;
         info!("Kill the server process");
         server.kill().await?;
 
@@ -88,16 +98,7 @@ impl Project {
             .run_async(|| async {
                 info!("Attempting to request the server");
 
-                let result = graphql_request(
-                    "
-                query {
-                    user(id: 1) {
-                        name
-                    }
-                }
-            ",
-                )
-                .await;
+                let result = TESTED_GRAPHQL_CLIENT.request(TEST_GRAPHQL_REQUEST).await;
 
                 if result.is_err() {
                     info!("Failed to resolve the response");
@@ -116,6 +117,26 @@ impl Project {
 
                 anyhow!("Server is not available")
             })?;
+
+        Ok(command)
+    }
+
+    #[instrument(skip_all)]
+    async fn run_reference_server(&self) -> Result<CommandInstance> {
+        info!("Start reference server");
+        let mut run_path = PathBuf::from(ROOT_DIR);
+        run_path.push("reference");
+        run_path.push("run.sh");
+
+        let mut command = Command::from_path(&run_path)?;
+        let command = command.run()?;
+
+        let retry = EasyRetry::new_linear_async(1, 5);
+
+        // wait until the server is ready for responses
+        retry
+            .run_async(|| async { REFERENCE_GRAPHQL_CLIENT.request(TEST_GRAPHQL_REQUEST).await })
+            .await?;
 
         Ok(command)
     }

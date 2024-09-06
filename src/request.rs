@@ -1,18 +1,30 @@
 use anyhow::Result;
 use serde_json::json;
 
-const API_URL: &str = "http://localhost:8000/graphql";
+pub struct GraphqlClient {
+    api: &'static str,
+}
 
-pub async fn graphql_request(query: &str) -> Result<serde_json::Value> {
-    let client = reqwest::Client::new();
+pub const TESTED_GRAPHQL_CLIENT: GraphqlClient = GraphqlClient {
+    api: "http://localhost:8000/graphql",
+};
 
-    let value = json!({
-        "operationName": null,
-        "variables": {},
-        "query": query
-    });
+pub const REFERENCE_GRAPHQL_CLIENT: GraphqlClient = GraphqlClient {
+    api: "http://localhost:8089/graphql",
+};
 
-    let response = client.post(API_URL).json(&value).send().await?;
+impl GraphqlClient {
+    pub async fn request(&self, query: &str) -> Result<serde_json::Value> {
+        let client = reqwest::Client::new();
 
-    Ok(response.json().await?)
+        let value = json!({
+            "operationName": null,
+            "variables": {},
+            "query": query
+        });
+
+        let response = client.post(self.api).json(&value).send().await?;
+
+        Ok(response.json().await?)
+    }
 }

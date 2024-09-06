@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use diff_logger::DiffLogger;
 use tracing::{error, info};
 
-use crate::request::graphql_request;
+use crate::request::{REFERENCE_GRAPHQL_CLIENT, TESTED_GRAPHQL_CLIENT};
 
 use super::ROOT_DIR;
 
@@ -33,18 +33,19 @@ pub async fn run_graphql_tests() -> Result<()> {
         .map_err(|e| anyhow!("Failed to resolve tests due to error: {e}"))?;
 
     for test in tests {
-        let actual = graphql_request(&test).await?;
+        let actual = TESTED_GRAPHQL_CLIENT.request(&test).await?;
 
-        // TODO: run from reference server
-        let expected = graphql_request(&test).await?;
+        let expected = REFERENCE_GRAPHQL_CLIENT.request(&test).await?;
 
         let differ = DiffLogger::new();
 
-        let difference = differ.diff(&actual, &expected);
+        let difference = differ.diff(&expected, &actual);
 
         if !difference.is_empty() {
-            error!("Actual response is not equal to expected
-    Note: left is expected response -> right is actual response");
+            error!(
+                "Actual response is not equal to expected
+    Note: left is expected response -> right is actual response"
+            );
             println!("{}", difference);
 
             return Err(anyhow!("Actual response is not equal to expected"));
