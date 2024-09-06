@@ -5,7 +5,6 @@ use serde_json::json;
 
 use crate::{PostData, UserData};
 
-
 pub struct Database {
     user_template: serde_json::Value,
     post_template: serde_json::Value,
@@ -43,25 +42,39 @@ impl Database {
     }
 
     pub fn update(&self) -> Result<(), anyhow::Error> {
-        self.reset();
+        // clear the previous data from database.
+        self.users
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Failed to clear users."))?
+            .clear();
+        self.posts
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Failed to clear posts."))?
+            .clear();
 
         // Generate and store users
-        let mut users_map = self.users.lock().unwrap();
-        (1..=10).for_each(|id| {
-            let mut user: UserData =
-                serde_json::from_str(&mock(&self.user_template).to_string()).unwrap();
+        let mut users_map = self
+            .users
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Failed to access users"))?;
+        for id in 1..=10 {
+            let mut user: UserData = serde_json::from_value(mock(&self.user_template))
+                .map_err(|_| anyhow::anyhow!("Failed to generate user"))?;
             user.id = id;
             users_map.insert(id, user);
-        });
+        }
 
         // Generate and store posts
-        let mut posts_map = self.posts.lock().unwrap();
-        (1..=20).for_each(|id| {
-            let mut post: PostData =
-                serde_json::from_str(&mock(&self.post_template).to_string()).unwrap();
+        let mut posts_map = self
+            .posts
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Failed to access posts"))?;
+        for id in 1..=20 {
+            let mut post: PostData = serde_json::from_value(mock(&self.post_template))
+                .map_err(|_| anyhow::anyhow!("Failed to generate user"))?;
             post.id = id;
             posts_map.insert(id, post);
-        });
+        }
 
         Ok(())
     }
@@ -80,10 +93,5 @@ impl Database {
 
     pub fn users(&self) -> Vec<UserData> {
         self.users.lock().unwrap().values().cloned().collect()
-    }
-
-    pub fn reset(&self) {
-        self.users.lock().unwrap().clear();
-        self.posts.lock().unwrap().clear();
     }
 }
