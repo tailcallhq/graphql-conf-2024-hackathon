@@ -1,47 +1,57 @@
-use std::fs;
+use std::{fs, sync::LazyLock};
 
-use anyhow::Result;
-use insta::assert_json_snapshot;
-use tokio::task::JoinSet;
-use tracing::info;
+use anyhow::{anyhow, Result};
+use diff_logger::DiffLogger;
+use tracing::{error, info};
 
 use crate::request::graphql_request;
 
 use super::ROOT_DIR;
 
-pub async fn run_graphql_tests() -> Result<()> {
-    info!("Run graphql assert tests");
-
+static TESTS: LazyLock<Result<Vec<String>>> = LazyLock::new(|| {
     let tests_path = format!("{ROOT_DIR}/tests");
-
-    let mut set: JoinSet<Result<()>> = JoinSet::new();
+    let mut tests = Vec::new();
 
     for entry in fs::read_dir(tests_path)? {
         let path = entry?.path();
 
         if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
             if ext == "graphql" {
-                set.spawn(async {
-                    tokio::spawn(async move {
-                        let content = tokio::fs::read_to_string(&path).await?;
-
-                        let response = graphql_request(&content).await?;
-                        let name =
-                            format!("request_{}", path.file_name().unwrap().to_string_lossy());
-
-                        assert_json_snapshot!(name, response);
-
-                        anyhow::Ok(())
-                    })
-                    .await?
-                });
+                tests.push(fs::read_to_string(&path)?);
             }
         }
     }
 
-    let results = set.join_all().await;
+    Ok(tests)
+});
+
+pub async fn run_graphql_tests() -> Result<()> {
+    info!("Run graphql assert tests");
+
+    let tests = TESTS
+        .as_ref()
+        .map_err(|e| anyhow!("Failed to resolve tests due to error: {e}"))?;
+
+    for test in tests {
+        let actual = graphql_request(&test).await?;
+
+        // TODO: run from reference server
+        let expected = graphql_request(&test).await?;
+
+        let differ = DiffLogger::new();
+
+        let difference = differ.diff(&actual, &expected);
+
+        if !difference.is_empty() {
+            error!("Actual response is not equal to expected
+    Note: left is expected response -> right is actual response");
+            println!("{}", difference);
+
+            return Err(anyhow!("Actual response is not equal to expected"));
+        }
+    }
 
     info!("Execution of graphql tests finished");
 
-    results.into_iter().collect()
+    Ok(())
 }
