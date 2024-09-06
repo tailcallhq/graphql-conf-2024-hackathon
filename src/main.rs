@@ -9,6 +9,7 @@ mod command;
 mod project;
 mod request;
 mod graphql_tests;
+mod utils;
 
 pub const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
 

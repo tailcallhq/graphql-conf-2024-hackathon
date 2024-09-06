@@ -50,7 +50,7 @@ fn main() -> Result<()> {
 
     let template = json!({
         "posts":[{
-            "id": "@Id|5",
+            "id": "@Number",
             "userId": "@Number|1~10",
             "title": "@Title",
             "body": "@Sentence",
