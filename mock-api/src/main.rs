@@ -1,6 +1,9 @@
-use std::{env, sync::Arc};
+use std::{env, sync::Arc, time::Duration};
 
-use axum::{http::StatusCode, response::IntoResponse, routing::get, Router};
+use axum::{
+    extract::Request, http::StatusCode, middleware::Next, response::IntoResponse, routing::get,
+    Router,
+};
 use mock_api::AppState;
 use tokio::net::TcpListener;
 use tower_governor::{
@@ -16,10 +19,11 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let _delay: i64 = env::var("BENCH_DELAY")
+    let delay: u64 = env::var("BENCH_DELAY")
         .unwrap_or("100".to_string())
         .parse()
         .unwrap();
+    let delay = Duration::from_millis(delay);
 
     let burst_size: u32 = env::var("BENCH_BURST_SIZE")
         .unwrap_or("1000".to_string())
@@ -50,9 +54,17 @@ async fn main() {
         .layer(GovernorLayer {
             config: rate_limiter_config,
         })
+        .layer(axum::middleware::from_fn(
+            move |request: Request, next: Next| {
+                let delay = delay.clone();
+                async move {
+                    let response = next.run(request).await;
+                    tokio::time::sleep(delay).await;
+                    response
+                }
+            },
+        ))
         .with_state(state);
-
-    // TODO: add latency layer
 
     let listener = TcpListener::bind("127.0.0.1:3000").await.unwrap();
 
