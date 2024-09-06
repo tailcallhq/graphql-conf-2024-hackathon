@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use axum::{http::StatusCode, response::IntoResponse};
 
 pub mod routes;
-pub mod delay_middleware;
 
 #[derive(Default)]
 pub struct AppState {
