@@ -56,7 +56,7 @@ impl Database {
 
         // Generate and store posts
         let mut posts_map = self.posts.lock().unwrap();
-        (1..=100).for_each(|id| {
+        (1..=20).for_each(|id| {
             let mut post: PostData =
                 serde_json::from_str(&mock(&self.post_template).to_string()).unwrap();
             post.id = id;
