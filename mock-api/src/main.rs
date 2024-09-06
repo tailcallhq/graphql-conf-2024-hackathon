@@ -47,6 +47,7 @@ async fn main() {
         .route("/posts/:post_id", get(mock_api::routes::get_post::handle))
         .route("/users", get(mock_api::routes::get_users::handle))
         .route("/users/:user_id", get(mock_api::routes::get_user::handle))
+        .route("/update", get(mock_api::routes::update_data::handle))  // New update endpoint
         .layer(GovernorLayer {
             config: rate_limiter_config,
         })

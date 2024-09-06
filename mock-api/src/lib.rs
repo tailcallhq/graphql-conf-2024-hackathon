@@ -1,18 +1,21 @@
+use std::{collections::HashMap, sync::Mutex};
+
 use axum::{http::StatusCode, response::IntoResponse};
+use mock_json::mock;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 pub mod routes;
 
-pub struct AppState {
-    // pub users: HashMap<i64, UserData>,
-    // pub posts: HashMap<String, PostData>,
-    pub user_template: serde_json::Value,
-    pub post_template: serde_json::Value,
+struct Database {
+    user_template: serde_json::Value,
+    post_template: serde_json::Value,
+    users: Mutex<HashMap<i64, UserData>>,
+    posts: Mutex<HashMap<i64, PostData>>,
 }
 
-impl Default for AppState {
-    fn default() -> Self {
+impl Database {
+    pub fn new() -> Self {
         Self {
             user_template: json!({
                     "id": "@Number|1~10",
@@ -35,7 +38,67 @@ impl Default for AppState {
                 "title": "@Title",
                 "body": "@Sentence",
             }),
+            users: Mutex::new(HashMap::new()),
+            posts: Mutex::new(HashMap::new()),
         }
+    }
+
+    pub fn update(&self) -> Result<(), anyhow::Error> {
+        self.reset();
+
+        // Generate and store users
+        let mut users_map = self.users.lock().unwrap();
+        (1..=10).for_each(|id| {
+            let mut user: UserData =
+                serde_json::from_str(&mock(&self.user_template).to_string()).unwrap();
+            user.id = id;
+            users_map.insert(id, user);
+        });
+
+        // Generate and store posts
+        let mut posts_map = self.posts.lock().unwrap();
+        (1..=100).for_each(|id| {
+            let mut post: PostData =
+                serde_json::from_str(&mock(&self.post_template).to_string()).unwrap();
+            post.id = id;
+            posts_map.insert(id, post);
+        });
+
+        Ok(())
+    }
+
+    pub fn posts(&self) -> Vec<PostData> {
+        self.posts.lock().unwrap().values().cloned().collect()
+    }
+
+    pub fn user(&self, id: i64) -> Option<UserData> {
+        self.users.lock().unwrap().get(&id).cloned()
+    }
+
+    pub fn post(&self, id: i64) -> Option<PostData> {
+        self.posts.lock().unwrap().get(&id).cloned()
+    }
+
+    pub fn users(&self) -> Vec<UserData> {
+        self.users.lock().unwrap().values().cloned().collect()
+    }
+
+    pub fn reset(&self) {
+        self.users.lock().unwrap().clear();
+        self.posts.lock().unwrap().clear();
+    }
+}
+
+pub struct AppState {
+    pub db: Database,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        let db = Database::new();
+        db.update();
+
+        Self { db }
     }
 }
 

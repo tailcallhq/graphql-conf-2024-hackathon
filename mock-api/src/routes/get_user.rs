@@ -5,16 +5,13 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use mock_json::mock;
 
-use crate::{AppError, AppState, UserData};
+use crate::{AppError, AppState};
 
 pub async fn handle(
     state: State<Arc<AppState>>,
     user_id: Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
     let user_id = user_id.0;
-    let mut user: UserData = serde_json::from_str(&mock(&state.user_template).to_string())?;
-    user.id = user_id;
-    Ok(Json(user))
+    Ok(Json(state.db.user(user_id)))
 }
