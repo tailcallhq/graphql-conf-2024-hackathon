@@ -49,24 +49,17 @@ pub struct PostData {
     pub body: String,
 }
 
-#[allow(dead_code)]
-pub struct AppError(anyhow::Error);
+pub enum AppError {
+    NotFound(String),
+    InternalServerError(String),
+}
 
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("INTERNAL_SERVER_ERROR"),
-        )
-            .into_response()
+        match self {
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg).into_response(),
+            AppError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
+        }
     }
 }
 
-impl<E> From<E> for AppError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(err: E) -> Self {
-        Self(err.into())
-    }
-}

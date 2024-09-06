@@ -13,5 +13,11 @@ pub async fn handle(
     post_id: Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
     let post_id = post_id.0;
-    Ok(Json(state.db.post(post_id)))
+    match state.db.post(post_id) {
+        Some(post) => Ok(Json(post)),
+        None => Err(AppError::NotFound(format!(
+            "Post with id {} not found",
+            post_id
+        ))),
+    }
 }
