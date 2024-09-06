@@ -799,6 +799,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "mock_json",
+ "serde",
+ "serde_json",
  "tokio",
  "tower_governor",
  "tracing",
@@ -1347,6 +1350,7 @@ version = "1.0.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8043c06d9f82bd7271361ed64f415fe5e12a77fdb52e573e7f06a516dea329ad"
 dependencies = [
+ "indexmap",
  "itoa",
  "memchr",
  "ryu",

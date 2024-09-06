@@ -39,7 +39,6 @@ async fn main() {
             .unwrap(),
     );
 
-    // TODO: load mock data from json files
     let state = Arc::new(AppState::default());
 
     let router = Router::new()
@@ -51,6 +50,7 @@ async fn main() {
         .route("/posts/:post_id", get(mock_api::routes::get_post::handle))
         .route("/users", get(mock_api::routes::get_users::handle))
         .route("/users/:user_id", get(mock_api::routes::get_user::handle))
+        .route("/reset", get(mock_api::routes::reset_database::handle))
         .layer(GovernorLayer {
             config: rate_limiter_config,
         })
