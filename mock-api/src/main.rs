@@ -20,7 +20,7 @@ async fn main() {
         .init();
 
     let delay: u64 = env::var("BENCH_DELAY")
-        .unwrap_or("3000".to_string())
+        .unwrap_or("100".to_string())
         .parse()
         .unwrap();
     let delay = Duration::from_millis(delay);
