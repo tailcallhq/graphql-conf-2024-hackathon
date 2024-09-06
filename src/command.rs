@@ -87,17 +87,4 @@ impl CommandInstance {
     pub async fn kill(mut self) -> Result<()> {
         Ok(self.child.kill().await?)
     }
-
-    pub async fn wait(&mut self) -> Result<()> {
-        let result = self.child.wait().await?;
-
-        if result.success() {
-            Ok(())
-        } else {
-            Err(anyhow!(
-                "Process failed with exit code: {}",
-                result.code().unwrap_or(0)
-            ))
-        }
-    }
 }

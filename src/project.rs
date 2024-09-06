@@ -53,13 +53,18 @@ impl Project {
         info!("Starting mock server");
 
         let mut mock_path = PathBuf::from(ROOT_DIR);
-        mock_path.push("mock.sh");
-        let mut command = Command::from_path(&mock_path)?;
+        mock_path.push("target");
 
-        command.args(&["mocks/1.json"]);
+        let mock_path = if mock_path.join("release/mock-api").exists() {
+            mock_path.join("release/mock-api")
+        } else {
+            mock_path.join("debug/mock-api")
+        };
+        let mut command = Command::from_path(&mock_path)?;
         let command = command.run()?;
 
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        // wait mock server to start
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         Ok(command)
     }

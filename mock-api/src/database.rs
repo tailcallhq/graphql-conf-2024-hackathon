@@ -83,15 +83,15 @@ impl Database {
         self.posts.lock().unwrap().values().cloned().collect()
     }
 
-    pub fn user(&self, id: i64) -> Option<UserData> {
-        self.users.lock().unwrap().get(&id).cloned()
-    }
-
     pub fn post(&self, id: i64) -> Option<PostData> {
         self.posts.lock().unwrap().get(&id).cloned()
     }
 
     pub fn users(&self) -> Vec<UserData> {
         self.users.lock().unwrap().values().cloned().collect()
+    }
+
+    pub fn user(&self, id: i64) -> Option<UserData> {
+        self.users.lock().unwrap().get(&id).cloned()
     }
 }
