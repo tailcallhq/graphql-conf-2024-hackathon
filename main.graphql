@@ -1,0 +1,42 @@
+schema
+  @server(port: 9090)
+
+  @upstream(baseURL: "http://127.0.0.1:3000") {
+  query: Query
+}
+
+type Query {
+  users: [User] @http(path: "/users")
+  user(id: ID!): User @http(path: "/users/{{.args.id}}")
+  posts: [Post] @http(path: "/posts")
+  post(id: ID!): Post @http(path: "/posts/{{.args.id}}")
+}
+
+type User {
+  id: ID!
+  email: String!
+  name: String!
+  phone: String!
+  username: String!
+  website: String!
+  address: Address!
+}
+
+type Address {
+    zipcode: String!,
+    geo: GeoLocation!
+}
+
+type GeoLocation {
+    lng: Float!
+    lat: Float!
+}
+
+type Post {
+  id: ID!
+  title: String!
+  body: String!
+  userId: Int!
+  # TODO: Fix batching
+  user: User! @http(path: "/users/{{.value.id}}")
+}
