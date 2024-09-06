@@ -74,8 +74,8 @@ impl Project {
         let command = command.run()?;
 
         let retry = EasyRetry::new_linear_async(
-            env_default("RUN_SCRIPT_RETRY_TIMEOUT", 100),
-            env_default("RUN_SCRIPT_RETRY_ATTEMPTS", 10),
+            env_default("RUN_SCRIPT_RETRY_TIMEOUT", 10),
+            env_default("RUN_SCRIPT_RETRY_ATTEMPTS", 100),
         );
 
         // wait until the server is ready for responses
