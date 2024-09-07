@@ -15,6 +15,7 @@ type Post {
   id: Int
   title: String
   body: String
+  userId: Int
   user: User @call(steps: [{query: "user", args: {id: "{{.value.userId}}"}}])
 }
 
