@@ -26,7 +26,7 @@ impl Database {
                         "zipcode": "@Zip",
                         "geo": {
                             "lat": "@Float",
-                            "lon": "@Float",
+                            "lng": "@Float",
                         }
                     }
             }),

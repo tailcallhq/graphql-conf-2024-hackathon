@@ -37,7 +37,7 @@ pub struct AddressData {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct GeoData {
     pub lat: f64,
-    pub lon: f64,
+    pub lng: f64,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
