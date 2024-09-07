@@ -1,7 +1,11 @@
 use std::{env, sync::Arc, time::Duration};
 
 use axum::{
-    extract::Request, http::StatusCode, middleware::Next, response::IntoResponse, routing::get,
+    extract::Request,
+    http::StatusCode,
+    middleware::Next,
+    response::IntoResponse,
+    routing::{get, post},
     Router,
 };
 use mock_api::AppState;
@@ -50,7 +54,7 @@ async fn main() {
         .route("/posts/:post_id", get(mock_api::routes::get_post::handle))
         .route("/users", get(mock_api::routes::get_users::handle))
         .route("/users/:user_id", get(mock_api::routes::get_user::handle))
-        .route("/reset", get(mock_api::routes::reset_database::handle))
+        .route("/reset", post(mock_api::routes::reset_database::handle))
         .layer(GovernorLayer {
             config: rate_limiter_config,
         })
