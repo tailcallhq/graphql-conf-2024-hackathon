@@ -1,4 +1,4 @@
-use std::{env, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use axum::{
     extract::Request,
@@ -8,7 +8,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use mock_api::AppState;
+use mock_api::{utils::env_default, AppState};
 use tokio::net::TcpListener;
 use tower_governor::{
     governor::GovernorConfigBuilder, key_extractor::GlobalKeyExtractor, GovernorLayer,
@@ -23,16 +23,10 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let delay: u64 = env::var("BENCH_DELAY")
-        .unwrap_or("100".to_string())
-        .parse()
-        .unwrap();
+    let delay = env_default("MOCK_SERVER_DELAY", 50);
     let delay = Duration::from_millis(delay);
 
-    let burst_size: u32 = env::var("BENCH_BURST_SIZE")
-        .unwrap_or("1000".to_string())
-        .parse()
-        .unwrap();
+    let burst_size = env_default("MOCK_SERVER_BURST_SIZE", 1000);
 
     let rate_limiter_config = Arc::new(
         GovernorConfigBuilder::default()
@@ -45,7 +39,7 @@ async fn main() {
 
     let state = Arc::new(AppState::default());
 
-    let router = Router::new()
+    let mut router = Router::new()
         .route(
             "/",
             get(|| async { (StatusCode::OK, "BENCHING").into_response() }),
@@ -55,9 +49,6 @@ async fn main() {
         .route("/users", get(mock_api::routes::get_users::handle))
         .route("/users/:user_id", get(mock_api::routes::get_user::handle))
         .route("/reset", post(mock_api::routes::reset_database::handle))
-        .layer(GovernorLayer {
-            config: rate_limiter_config,
-        })
         .layer(axum::middleware::from_fn(
             move |request: Request, next: Next| {
                 let delay = delay.clone();
@@ -69,6 +60,12 @@ async fn main() {
             },
         ))
         .with_state(state);
+
+    if env_default("MOCK_SERVER_LIMITER_ENABLED", false) {
+        router = router.layer(GovernorLayer {
+            config: rate_limiter_config,
+        })
+    }
 
     let listener = TcpListener::bind("127.0.0.1:3000").await.unwrap();
 
