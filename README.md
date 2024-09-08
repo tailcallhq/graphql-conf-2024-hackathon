@@ -40,6 +40,16 @@ The structure of the REST API responses will match the GraphQL schema fields.
 
 Your GraphQL server should start on url `http://localhost:8000/graphql` and serve `POST` Graphql requests on it.
 
+### Rules
+
+- Participant's implementation should follow stated [objective](#objective)
+- The solution should be provided as pull-request to this repo from participant's fork
+- The pull-request should contain only file additions inside `/projects/${participant_name}` without changes in the other repo files or other participants code
+- The solution could be implemented in any language or framework or using specific tools within the scope of the licence granted by used tools. The only prohibition is  the use of the [tailcall](https://github.com/tailcallhq/tailcall/) tool
+- The solution should contain all source code and setup that is required to understand how the solution was achieved and how to run it
+- Cooperation on single solution is acceptable, but only the author of the pr will be eligible to win the prize
+- In case of the multiple solutions with identical code will be candidates for prize only the solution that was added first will be eligible for prize
+
 ## Getting Started
 
 1. Fork this repository
@@ -60,10 +70,21 @@ Your GraphQL server should start on url `http://localhost:8000/graphql` and serv
 
 ## How implementation is checked
 
+1. Build everything that is required to run test environment and custom implementation
+2. Start the test environment to validate response: mock server and reference server that is used to test implementation correctness
+3. Run correctness tests
+4. Run the benchmark
+5. Run correctness tests again
+
 ### Testing correctness
 
-TODO:
+For testing the correctness repeat next process multiple times:
+
+1. Regenerate mocks on mock-api server
+2. For every request in `/tests` directory execute the request to user implementation
+3. Execute the same request for reference implementation
+4. Compare the results and in case they are mismatch throw an error
 
 ### Benchmarking the performance
 
-TODO:
+Ran many requests in parallel to the server with tools like `wrk` or `k6` to collect info about provided RPS and latency
