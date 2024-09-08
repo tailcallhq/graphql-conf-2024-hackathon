@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod database;
 pub mod routes;
+pub mod utils;
 
 pub struct AppState {
     pub db: Database,
