@@ -1,13 +1,24 @@
 use anyhow::{anyhow, Result};
+use easy_retry::EasyRetry;
 use std::{path::PathBuf, time::Duration};
 use tokio::{fs, io::AsyncWriteExt};
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 use crate::{
     command::{Command, CommandInstance},
     graphql_tests::run_graphql_tests,
+    request::{REFERENCE_GRAPHQL_CLIENT, TESTED_GRAPHQL_CLIENT},
+    utils::env_default,
     ROOT_DIR,
 };
+
+static TEST_GRAPHQL_REQUEST: &str = "
+query {
+    user(id: 1) {
+        name
+    }
+}
+";
 
 /// Runs tests and benchmarks for single project
 pub struct Project {
@@ -31,8 +42,8 @@ impl Project {
     pub async fn run_project(self) -> Result<()> {
         info!("Starting project: {}", &self.name);
 
-        self.run_setup().await?;
         let mock_server = self.run_mock_server().await?;
+        let reference_server = self.run_reference_server().await?;
         let server = self.run_server().await?;
 
         run_graphql_tests().await?;
@@ -40,22 +51,9 @@ impl Project {
         run_graphql_tests().await?;
 
         mock_server.kill().await?;
+        reference_server.kill().await?;
         info!("Kill the server process");
         server.kill().await?;
-
-        Ok(())
-    }
-
-    #[instrument(skip_all)]
-    async fn run_setup(&self) -> Result<()> {
-        info!("Run setup.sh");
-        let mut setup_path = self.path.clone();
-        setup_path.push("setup.sh");
-
-        let mut command = Command::from_path(&setup_path)?;
-        let mut command = command.run()?;
-
-        command.wait().await?;
 
         Ok(())
     }
@@ -65,13 +63,18 @@ impl Project {
         info!("Starting mock server");
 
         let mut mock_path = PathBuf::from(ROOT_DIR);
-        mock_path.push("mock.sh");
-        let mut command = Command::from_path(&mock_path)?;
+        mock_path.push("target");
 
-        command.args(&["mocks/1.json"]);
+        let mock_path = if mock_path.join("release/mock-api").exists() {
+            mock_path.join("release/mock-api")
+        } else {
+            mock_path.join("debug/mock-api")
+        };
+        let mut command = Command::from_path(&mock_path)?;
         let command = command.run()?;
 
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        // wait mock server to start
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         Ok(command)
     }
@@ -85,8 +88,55 @@ impl Project {
         let mut command = Command::from_path(&run_path)?;
         let command = command.run()?;
 
-        // TODO: wait for server with timeout instead of explicit timeout
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        let retry = EasyRetry::new_linear_async(
+            env_default("RUN_SCRIPT_RETRY_TIMEOUT", 10),
+            env_default("RUN_SCRIPT_RETRY_ATTEMPTS", 100),
+        );
+
+        // wait until the server is ready for responses
+        retry
+            .run_async(|| async {
+                info!("Attempting to request the server");
+
+                let result = TESTED_GRAPHQL_CLIENT.request(TEST_GRAPHQL_REQUEST).await;
+
+                if result.is_err() {
+                    info!("Failed to resolve the response");
+                } else {
+                    info!("Request to server successful");
+                }
+
+                result
+            })
+            .await
+            .map_err(|_| {
+                error!(
+                    "Failed to request `http://localhost:8000/graphql` after multiple attempts.
+    Please, verify your setup"
+                );
+
+                anyhow!("Server is not available")
+            })?;
+
+        Ok(command)
+    }
+
+    #[instrument(skip_all)]
+    async fn run_reference_server(&self) -> Result<CommandInstance> {
+        info!("Start reference server");
+        let mut run_path = PathBuf::from(ROOT_DIR);
+        run_path.push("reference");
+        run_path.push("run.sh");
+
+        let mut command = Command::from_path(&run_path)?;
+        let command = command.run()?;
+
+        let retry = EasyRetry::new_linear_async(1, 5);
+
+        // wait until the server is ready for responses
+        retry
+            .run_async(|| async { REFERENCE_GRAPHQL_CLIENT.request(TEST_GRAPHQL_REQUEST).await })
+            .await?;
 
         Ok(command)
     }
@@ -102,7 +152,10 @@ impl Project {
 
         let output = command.run_and_capture().await?;
 
-        info!("Benchmark results:\n\n {}", String::from_utf8_lossy(&output.stdout));
+        info!(
+            "Benchmark results:\n\n {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
 
         let mut output_path = PathBuf::from(ROOT_DIR);
         output_path.push("results");

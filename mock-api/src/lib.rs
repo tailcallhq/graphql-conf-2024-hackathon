@@ -1,15 +1,23 @@
-use std::collections::HashMap;
-
 use axum::{http::StatusCode, response::IntoResponse};
+use database::Database;
+use serde::{Deserialize, Serialize};
 
+pub mod database;
 pub mod routes;
 
-#[derive(Default)]
 pub struct AppState {
-    pub users: HashMap<i64, UserData>,
-    pub posts: HashMap<String, PostData>,
+    pub db: Database,
 }
 
+impl Default for AppState {
+    fn default() -> Self {
+        let db = Database::new();
+        let _ = db.reset().unwrap();
+        Self { db }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UserData {
     pub id: i64,
     pub name: String,
@@ -20,41 +28,38 @@ pub struct UserData {
     pub address: AddressData,
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AddressData {
     pub geo: GeoData,
     pub zipcode: String,
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct GeoData {
     pub lat: f64,
-    pub lon: f64,
+    pub lng: f64,
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct PostData {
-    pub id: String,
+    pub id: i64,
     pub title: String,
     pub user_id: i64,
     pub body: String,
 }
 
-#[allow(dead_code)]
-pub struct AppError(anyhow::Error);
+pub enum AppError {
+    NotFound(String),
+    InternalServerError(String),
+}
 
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("INTERNAL_SERVER_ERROR"),
-        )
-            .into_response()
+        match self {
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg).into_response(),
+            AppError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
+        }
     }
 }
 
-impl<E> From<E> for AppError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(err: E) -> Self {
-        Self(err.into())
-    }
-}
