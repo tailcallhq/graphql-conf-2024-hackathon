@@ -12,6 +12,16 @@ pub struct Database {
     posts: Mutex<HashMap<i64, PostData>>,
 }
 
+// JSON.parse in js converts values like 1.0 to integer
+// while reference implementation stays with float.
+// To ignore such inconsistency add fractional part for
+// every value if it's not there
+fn geo_add_fractional_part(val: &mut f64) {
+    if val.fract() == 0.0 {
+        *val += 0.01;
+    }
+}
+
 impl Database {
     pub fn new() -> Self {
         Self {
@@ -25,8 +35,8 @@ impl Database {
                     "address": {
                         "zipcode": "@Zip",
                         "geo": {
-                            "lat": "@Float",
-                            "lng": "@Float",
+                            "lat": "@Float|4|-90~90",
+                            "lng": "@Float|4|-180~180",
                         }
                     }
             }),
@@ -61,6 +71,8 @@ impl Database {
             let mut user: UserData = serde_json::from_value(mock(&self.user_template))
                 .map_err(|_| anyhow::anyhow!("Failed to generate user"))?;
             user.id = id;
+            geo_add_fractional_part(&mut user.address.geo.lat);
+            geo_add_fractional_part(&mut user.address.geo.lng);
             users_map.insert(id, user);
         }
 

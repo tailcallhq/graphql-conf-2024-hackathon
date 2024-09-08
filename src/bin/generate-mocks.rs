@@ -65,8 +65,8 @@ fn main() -> Result<()> {
             "address": {
                 "zipcode": "@Zip",
                 "geo": {
-                    "lat": "@Float",
-                    "lng": "@Float",
+                    "lat": "@Float|4|-90~90",
+                    "lng": "@Float|4|-180~180",
                 }
             }
         }, 9, 10]
