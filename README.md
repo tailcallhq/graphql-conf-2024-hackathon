@@ -33,6 +33,7 @@ Endpoints:
 - /posts/:id (returns a post by ID)
 - /users (returns a list of users)
 - /users/:id (returns a user by ID)
+- /users?id=1&id=2&id=3 (returns multiple users with ids in query params)
 
 The structure of the REST API responses will match the GraphQL schema fields.
 
