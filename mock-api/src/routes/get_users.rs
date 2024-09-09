@@ -15,7 +15,8 @@ pub async fn handle(
     let users = if params.is_empty() {
         state.db.users()
     } else {
-        params.into_iter()
+        params
+            .into_iter()
             .filter(|(key, _)| key == "id")
             .filter_map(|(_, id)| state.db.user(id))
             .collect()
