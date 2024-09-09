@@ -29,11 +29,11 @@ Your GraphQL server will need to fetch data from the upstream REST API at:
 
 Endpoints:
 
-- /posts (returns a list of posts)
-- /posts/:id (returns a post by ID)
-- /users (returns a list of users)
-- /users/:id (returns a user by ID)
-- /users?id=1&id=2&id=3 (returns multiple users with ids in query params)
+- GET /posts (returns a list of posts)
+- GET /posts/:id (returns a post by ID)
+- GET /users (returns a list of users)
+- GET /users/:id (returns a user by ID)
+- GET /users?id=1&id=2&id=3 (returns multiple users with ids in query params)
 
 The structure of the REST API responses will match the GraphQL schema fields.
 
@@ -68,6 +68,40 @@ Your GraphQL server should start on url `http://localhost:8000/graphql` and serv
 6. Make sure your code is working and handles GraphQL requests
 7. Commit and push changes to your fork
 8. Create a pull request from your fork into original repository
+
+### Run mock server locally
+
+To run the mock server locally you need a [Rust toolchain](https://rustup.rs) installed.
+
+To run the mock server in the root of the repo run:
+
+```sh
+cargo run -p mock-api
+```
+
+The server will start on `http://localhost:3000` and will serve the endpoints mentioned in [data source](#data-source-upstream-rest-api)
+
+### Run test suite locally
+
+To run the whole test suite locally you need a [Rust toolchain](https://rustup.rs) installed.
+
+For the first time you need to build the mock server code (one-time run):
+
+```sh
+cargo build -p mock-api
+```
+
+After finishing the command you can use following command to run test suite:
+
+```sh
+cargo run
+```
+
+If you need to run only specific project, specify this project as option with name of the directory of the project:
+
+```sh
+cargo run -- --project tailcall
+```
 
 ## How implementation is checked
 
