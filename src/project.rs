@@ -37,6 +37,10 @@ impl Project {
         Ok(Project { path, name })
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     /// Run the tests and benchmarks
     #[instrument(skip_all, fields(project = &self.name))]
     pub async fn run_project(self) -> Result<()> {

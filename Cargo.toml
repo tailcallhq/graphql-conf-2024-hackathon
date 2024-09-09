@@ -6,6 +6,7 @@ default-run = "hackathon"
 
 [dependencies]
 anyhow = "1.0.86"
+clap = { version = "4.5.17", features = ["derive"] }
 command-group = { version = "5.0.1", features = ["with-tokio"] }
 diff_logger = "0.1.0"
 easy_retry = { version = "0.1.0", features = ["async"] }

@@ -1,19 +1,27 @@
 use std::fs;
 
 use anyhow::Result;
-use tracing::error;
+use clap::Parser;
+use tracing::{error, info};
 
 use project::Project;
 
 mod command;
+mod graphql_tests;
 mod project;
 mod request;
-mod graphql_tests;
 mod utils;
 
 pub const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(long)]
+    project: Option<String>,
+}
+
 async fn run() -> Result<()> {
+    let args = Args::parse();
     let projects_dir = format!("{ROOT_DIR}/projects");
 
     for entry in fs::read_dir(projects_dir)? {
@@ -21,6 +29,13 @@ async fn run() -> Result<()> {
 
         if path.is_dir() {
             let project = Project::new(path)?;
+
+            if let Some(only_project) = &args.project {
+                if project.name() != only_project {
+                    info!("Ignore project: {}", project.name());
+                    continue;
+                }
+            }
 
             project.run_project().await?;
         }
