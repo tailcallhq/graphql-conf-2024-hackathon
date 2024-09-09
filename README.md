@@ -1,8 +1,8 @@
-# 🚀 GraphQL Conf Hackathon 2024
+# 🚀 GraphQL Conf Hackathon 2024 | Tailcall
 
 ## Overview
 
-Welcome to the GraphQL Hackathon 2024, where you will implement a GraphQL server that resolves data from upstream REST APIs! Your mission is to implement the GraphQL schema provided below, efficiently resolving queries while ensuring high performance and correctness.
+Welcome to the Tailcall GraphQL Hackathon 2024, where you will implement a GraphQL server that resolves data from upstream REST APIs! Your mission is to implement the GraphQL schema provided below, efficiently resolving queries while ensuring high performance and correctness.
 
 **Challenge**: Build a GraphQL server that:
 
