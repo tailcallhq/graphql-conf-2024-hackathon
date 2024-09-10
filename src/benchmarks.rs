@@ -97,6 +97,19 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
 
         let single_stats = parse_wrk(stdout)?;
 
+        if single_stats.read_errors > 0 {
+            bail!("Execution failed because read_errors")
+        }
+        if single_stats.write_errors > 0 {
+            bail!("Execution failed because write_errors")
+        }
+        if single_stats.connect_errors > 0 {
+            bail!("Execution failed because connect_errors")
+        }
+        if single_stats.timeout_errors > 0 {
+            bail!("Execution failed because timeout_errors")
+        }
+
         stats.insert(bench_name.to_string(), single_stats);
     }
 
