@@ -37,3 +37,12 @@ jobs:
 
       - name: Run Benchmarks
         run: cargo run
+
+      - name: Prepare JSON
+        run: ./tojson.sh
+
+      - name: Print Results
+        run: ./printjson.sh
+
+      - name: Check Result
+        run: ./check.sh
