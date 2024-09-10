@@ -72,23 +72,15 @@ impl Query {
                 true
             } else {
                 store.reset();
-                store
-                    .post
-                    .write()
-                    .unwrap()
-                    .insert(posts[1].id.unwrap(), posts[1].clone());
-                store
-                    .post
-                    .write()
-                    .unwrap()
-                    .insert(posts[2].id.unwrap(), posts[2].clone());
+                let store_post_writer = store.post.writer().unwrap();
+                store_post_writer.insert(posts[1].id.unwrap(), posts[1].clone());
+                store_post_writer.insert(posts[2].id.unwrap(), posts[2].clone());
                 false
             }
         };
 
         {
-            let mut is_post_same = store.is_post_same.write().unwrap();
-            *is_post_same = is_same;
+            *store.is_post_same.write().unwrap() = is_same;
         }
 
         Ok(posts)
@@ -103,6 +95,7 @@ impl Query {
         let post = loader.load_one(id).await?;
         if let Some(actual_post) = post.as_ref() {
             // cache the post early
+            // if post already exists in store, check if it's the same or not. if not same then clean up the store.
             let store = ctx.data_unchecked::<Arc<Store>>();
             store.post.write().unwrap().insert(id, actual_post.clone());
         }
@@ -113,7 +106,6 @@ impl Query {
         &self,
         ctx: &Context<'_>,
     ) -> std::result::Result<Vec<User>, async_graphql::Error> {
-        // TODO: cache all the users here.
         let client = ctx.data_unchecked::<Arc<Client>>();
         let response = client.get(format!("{}/users", BASE_URL)).send().await?;
         let users: Vec<User> = serde_json::from_value(response.json().await?)?;
@@ -131,6 +123,7 @@ impl Query {
         if let Some(actual_user) = &user {
             // cache the user early
             let store = ctx.data_unchecked::<Arc<Store>>();
+            // if user already exists in store, check if it's the same or not. if not same then clean up the store.
             store.users.write().unwrap().insert(id, actual_user.clone());
         }
 
