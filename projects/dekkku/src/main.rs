@@ -4,6 +4,7 @@ use async_graphql_poem::*;
 use poem::{listener::TcpListener, web::Html, *};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 const BASE_URL: &str = "http://localhost:3000";
@@ -12,55 +13,59 @@ struct Query;
 
 #[Object]
 impl Query {
-    async fn posts(&self, ctx: &Context<'_>) -> anyhow::Result<Vec<Post>> {
+    async fn posts(
+        &self,
+        ctx: &Context<'_>,
+    ) -> std::result::Result<Vec<Post>, async_graphql::Error> {
         let client = ctx.data_unchecked::<Arc<Client>>();
+        let user_loader = ctx.data_unchecked::<UserLoader>();
         let response = client.get(format!("{}/posts", BASE_URL)).send().await?;
-        let posts: serde_json::Value = response.json().await?;
-        let posts: Vec<Post> = serde_json::from_value(posts)?;
+        let mut posts: Vec<Post> = serde_json::from_value(response.json().await?)?;
+
+        let user_ids: HashSet<_> = posts.iter().map(|post| post.user_id).collect();
+        let users = user_loader
+            .load(&user_ids.into_iter().collect::<Vec<_>>())
+            .await?;
+
+        for post in &mut posts {
+            post.user = users.get(&post.user_id).cloned();
+        }
         Ok(posts)
     }
 
-    async fn post(&self, ctx: &Context<'_>, id: i32) -> anyhow::Result<Option<Post>> {
-        let client = ctx.data_unchecked::<Arc<Client>>();
-        let response = client
-            .get(format!("{}/posts/{}", BASE_URL, id))
-            .send()
-            .await?;
-        if response.status().is_success() {
-            let post: serde_json::Value = response.json().await?;
-            let post = serde_json::from_value(post)?;
-            Ok(Some(post))
-        } else {
-            Ok(None)
-        }
+    async fn post(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+    ) -> std::result::Result<Option<Post>, async_graphql::Error> {
+        let loader = ctx.data_unchecked::<PostLoader>();
+        let posts = loader.load(&[id]).await?;
+        Ok(posts.get(&id).cloned())
     }
 
-    async fn users(&self, ctx: &Context<'_>) -> anyhow::Result<Vec<User>> {
+    async fn users(
+        &self,
+        ctx: &Context<'_>,
+    ) -> std::result::Result<Vec<User>, async_graphql::Error> {
         let client = ctx.data_unchecked::<Arc<Client>>();
         let response = client.get(format!("{}/users", BASE_URL)).send().await?;
-        let users: serde_json::Value = response.json().await?;
-        let users: Vec<User> = serde_json::from_value(users)?;
+        let users: Vec<User> = serde_json::from_value(response.json().await?)?;
         Ok(users)
     }
 
-    async fn user(&self, ctx: &Context<'_>, id: i32) -> anyhow::Result<Option<User>> {
-        let client = ctx.data_unchecked::<Arc<Client>>();
-        let response = client
-            .get(format!("{}/users/{}", BASE_URL, id))
-            .send()
-            .await?;
-        if response.status().is_success() {
-            let user: serde_json::Value = response.json().await?;
-            let user = serde_json::from_value(user)?;
-            Ok(Some(user))
-        } else {
-            Ok(None)
-        }
+    async fn user(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+    ) -> std::result::Result<Option<User>, async_graphql::Error> {
+        let loader = ctx.data_unchecked::<UserLoader>();
+        let users = loader.load(&[id]).await?;
+        Ok(users.get(&id).cloned())
     }
 }
 
-#[derive(SimpleObject, Serialize, Deserialize, Debug)]
-#[graphql(complex)]
+#[derive(SimpleObject, Serialize, Deserialize, Debug, Clone)]
+// #[graphql(complex)]
 #[serde(rename_all = "camelCase")]
 struct Post {
     id: Option<i32>,
@@ -68,23 +73,10 @@ struct Post {
     user_id: i32,
     title: Option<String>,
     body: Option<String>,
+    user: Option<User>,
 }
 
-#[ComplexObject]
-impl Post {
-    async fn user(&self, ctx: &Context<'_>) -> anyhow::Result<User> {
-        let client = ctx.data_unchecked::<Arc<Client>>();
-        let response = client
-            .get(format!("{}/users/{}", BASE_URL, self.user_id))
-            .send()
-            .await?;
-        let user: serde_json::Value = response.json().await?;
-        let user = serde_json::from_value(user)?;
-        Ok(user)
-    }
-}
-
-#[derive(SimpleObject, Serialize, Deserialize, Debug)]
+#[derive(SimpleObject, Serialize, Deserialize, Debug, Clone)]
 struct User {
     id: Option<i32>,
     name: Option<String>,
@@ -95,34 +87,81 @@ struct User {
     website: Option<String>,
 }
 
-#[ComplexObject]
-impl User {
-    async fn posts(&self, ctx: &Context<'_>) -> anyhow::Result<Vec<Post>> {
-        let client = ctx.data_unchecked::<Arc<Client>>();
-        let response = client
-            .get(format!("{}/posts?userId={}", BASE_URL, self.id.unwrap()))
-            .send()
-            .await?;
-        let posts: Vec<Post> = response.json().await?;
-        Ok(posts)
-    }
-}
-
-#[derive(SimpleObject, Serialize, Deserialize, Debug)]
+#[derive(SimpleObject, Serialize, Deserialize, Debug, Clone)]
 struct Address {
     zipcode: Option<String>,
     geo: Option<Geo>,
 }
 
-#[derive(SimpleObject, Serialize, Deserialize, Debug)]
+#[derive(SimpleObject, Serialize, Deserialize, Debug, Clone)]
 struct Geo {
     lat: Option<f64>,
     lng: Option<f64>,
 }
 
+use async_graphql::dataloader::Loader;
+
+struct PostLoader(Arc<Client>);
+struct UserLoader(Arc<Client>);
+
+impl Loader<i32> for PostLoader {
+    type Value = Post;
+    type Error = async_graphql::Error;
+
+    async fn load(
+        &self,
+        keys: &[i32],
+    ) -> std::result::Result<std::collections::HashMap<i32, Self::Value>, Self::Error> {
+        let mut result = std::collections::HashMap::new();
+        for &id in keys {
+            let url = format!("{}/posts/{}", BASE_URL, id);
+            println!("http request: {}", url);
+            let response = self.0.get(url).send().await?;
+            if response.status().is_success() {
+                let post: Post = response.json().await?;
+                result.insert(id, post);
+            }
+        }
+        Ok(result)
+    }
+}
+
+impl Loader<i32> for UserLoader {
+    type Value = User;
+    type Error = async_graphql::Error;
+
+    async fn load(
+        &self,
+        keys: &[i32],
+    ) -> std::result::Result<std::collections::HashMap<i32, Self::Value>, Self::Error> {
+        let mut result = std::collections::HashMap::new();
+
+        let qp = keys
+            .iter()
+            .map(|id| format!("id={}", id))
+            .collect::<Vec<_>>()
+            .join("&");
+        let url = format!("{}/users?{}", BASE_URL, qp);
+        println!("http request: {}", url);
+        let response = self.0.get(url).send().await?;
+        if response.status().is_success() {
+            let users: Vec<User> = response.json().await?;
+            for user in users {
+                if let Some(id) = user.id {
+                    result.insert(id, user);
+                }
+            }
+        }
+        Ok(result)
+    }
+}
+
 fn create_schema() -> Schema<Query, EmptyMutation, EmptySubscription> {
+    let client = Arc::new(Client::new());
     Schema::build(Query, EmptyMutation, EmptySubscription)
-        .data(Arc::new(Client::new()))
+        .data(client.clone())
+        .data(UserLoader(client.clone()))
+        .data(PostLoader(client.clone()))
         .finish()
 }
 
@@ -136,8 +175,10 @@ async fn main() -> anyhow::Result<()> {
     let schema = create_schema();
 
     // start the http server
-    let app = Route::new().at("/graphql", get(graphiql).post(GraphQL::new(schema)));
-    println!("GraphiQL: http://localhost:8000");
+    let app = Route::new()
+        .at("/graphql", get(graphiql).post(GraphQL::new(schema.clone())))
+        .at("/", get(graphiql).post(GraphQL::new(schema.clone())));
+    println!("GraphiQL: http://localhost:8000/graphql");
     Server::new(TcpListener::bind("0.0.0.0:8000"))
         .run(app)
         .await?;
