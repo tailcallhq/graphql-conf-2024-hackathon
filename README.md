@@ -60,3 +60,12 @@ type Geo {
 
 - We might add new tests and modify the existing ones to ensure its there is no hardcoding and its a level playing field for all.
 - If you questions or doubts about the hackathon, connect with us on [Discord] or [Twitter] or the only two people in that bright yellow T-Shirt they'd be glad to say 👋.
+
+### Rules
+
+- The solution should be provided as pull-request to this repo from participant's fork.
+- The pull-request should contain only file additions inside `/projects/${participant_name}` without changes in the other repo files or other participants code.
+- The solution could be implemented in any language or framework or using specific tools within the scope of the license granted by used tools. The only prohibition is the use of the [tailcall](https://github.com/tailcallhq/tailcall/) tool.
+- The solution should contain all source code and setup that is required to understand how the solution was achieved and how to run it.
+- Cooperation on single solution is acceptable, but only the author of the pr will be eligible to win the prize.
+- In case of the multiple solutions with identical code will be candidates for prize only the solution that was added first will be eligible for prize.
