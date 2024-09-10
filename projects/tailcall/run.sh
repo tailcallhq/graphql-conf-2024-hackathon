@@ -11,4 +11,4 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SCHEMA_FILE="${SCRIPT_DIR}/tailcall.graphql"
 
 # Start Tailcall
-tailcall start "${SCHEMA_FILE}"
+TAILCALL_LOG_LEVEL=error TC_TRACKER=false tailcall start "${SCHEMA_FILE}"
