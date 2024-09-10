@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-cargo run -p dekkku
+cargo run -p dekkku --release
