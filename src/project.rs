@@ -1,10 +1,10 @@
 use anyhow::{anyhow, Result};
 use easy_retry::EasyRetry;
 use std::{path::PathBuf, time::Duration};
-use tokio::{fs, io::AsyncWriteExt};
 use tracing::{error, info, instrument};
 
 use crate::{
+    benchmarks::run_benchmarks,
     command::{Command, CommandInstance},
     graphql_tests::run_graphql_tests,
     request::{REFERENCE_GRAPHQL_CLIENT, TESTED_GRAPHQL_CLIENT},
@@ -51,7 +51,7 @@ impl Project {
         let server = self.run_server().await?;
 
         run_graphql_tests().await?;
-        self.run_benchmark().await?;
+        run_benchmarks(self.name()).await?;
         run_graphql_tests().await?;
 
         mock_server.kill().await?;
@@ -143,41 +143,5 @@ impl Project {
             .await?;
 
         Ok(command)
-    }
-
-    #[instrument(skip_all)]
-    async fn run_benchmark(&self) -> Result<()> {
-        info!("Starting benchmark");
-        let mut mock_path = PathBuf::from(ROOT_DIR);
-        mock_path.push("benchmark.sh");
-        let mut command = Command::from_path(&mock_path)?;
-
-        command.args(&["1"]);
-
-        let output = command.run_and_capture().await?;
-
-        info!(
-            "Benchmark results:\n\n {}",
-            String::from_utf8_lossy(&output.stdout)
-        );
-
-        let mut output_path = PathBuf::from(ROOT_DIR);
-        output_path.push("results");
-        output_path.push(&self.name);
-
-        fs::create_dir_all(&output_path).await?;
-
-        output_path.push("bench_1.out");
-
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(output_path)
-            .await?;
-
-        file.write_all(&output.stdout).await?;
-
-        Ok(())
     }
 }

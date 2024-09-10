@@ -6,6 +6,7 @@ use tracing::{error, info};
 
 use project::Project;
 
+mod benchmarks;
 mod command;
 mod graphql_tests;
 mod project;
