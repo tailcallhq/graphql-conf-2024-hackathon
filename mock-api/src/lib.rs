@@ -6,6 +6,7 @@ pub mod database;
 pub mod routes;
 pub mod utils;
 
+/// Represents the application state
 pub struct AppState {
     pub db: Database,
 }
@@ -50,12 +51,18 @@ pub struct PostData {
     pub body: String,
 }
 
+/// Custom error types for the application.
 pub enum AppError {
+    /// Error indicating that a requested resource was not found.
     NotFound(String),
+    /// Error indicating an internal server error occurred.
     InternalServerError(String),
 }
 
 impl IntoResponse for AppError {
+    /// Convert the error into an HTTP response.
+    ///
+    /// Maps the error variant to the corresponding HTTP status code and message.
     fn into_response(self) -> axum::response::Response {
         match self {
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg).into_response(),
@@ -63,4 +70,3 @@ impl IntoResponse for AppError {
         }
     }
 }
-
