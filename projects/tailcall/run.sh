@@ -2,8 +2,13 @@
 
 set -e
 
-# TODO: implement installation
 npm install -g @tailcallhq/tailcall
 
-# TODO: run the server
-tailcall start reference/schema.graphql
+# Get the directory of the script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Set the path to the schema file relative to the script location
+SCHEMA_FILE="${SCRIPT_DIR}/tailcall.graphql"
+
+# Start Tailcall
+tailcall start "${SCHEMA_FILE}"
