@@ -8,6 +8,7 @@ use axum::{
 
 use crate::{AppError, AppState};
 
+/// route handler for getting all users
 pub async fn handle(
     state: State<Arc<AppState>>,
     Query(params): Query<Vec<(String, i64)>>,
