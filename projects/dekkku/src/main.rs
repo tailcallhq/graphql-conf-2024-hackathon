@@ -136,7 +136,7 @@ async fn main() -> anyhow::Result<()> {
     let schema = create_schema();
 
     // start the http server
-    let app = Route::new().at("/", get(graphiql).post(GraphQL::new(schema)));
+    let app = Route::new().at("/graphql", get(graphiql).post(GraphQL::new(schema)));
     println!("GraphiQL: http://localhost:8000");
     Server::new(TcpListener::bind("0.0.0.0:8000"))
         .run(app)
