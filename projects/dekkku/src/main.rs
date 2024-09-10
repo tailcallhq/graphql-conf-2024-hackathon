@@ -1,11 +1,11 @@
+use async_graphql::dataloader::*;
 use async_graphql::http::GraphiQLSource;
 use async_graphql::*;
 use async_graphql_poem::*;
 use poem::{listener::TcpListener, web::Html, *};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 const BASE_URL: &str = "http://localhost:3000";
 
@@ -18,18 +18,8 @@ impl Query {
         ctx: &Context<'_>,
     ) -> std::result::Result<Vec<Post>, async_graphql::Error> {
         let client = ctx.data_unchecked::<Arc<Client>>();
-        let user_loader = ctx.data_unchecked::<UserLoader>();
         let response = client.get(format!("{}/posts", BASE_URL)).send().await?;
-        let mut posts: Vec<Post> = serde_json::from_value(response.json().await?)?;
-
-        let user_ids: HashSet<_> = posts.iter().map(|post| post.user_id).collect();
-        let users = user_loader
-            .load(&user_ids.into_iter().collect::<Vec<_>>())
-            .await?;
-
-        for post in &mut posts {
-            post.user = users.get(&post.user_id).cloned();
-        }
+        let posts: Vec<Post> = serde_json::from_value(response.json().await?)?;
         Ok(posts)
     }
 
@@ -38,9 +28,9 @@ impl Query {
         ctx: &Context<'_>,
         id: i32,
     ) -> std::result::Result<Option<Post>, async_graphql::Error> {
-        let loader = ctx.data_unchecked::<PostLoader>();
-        let posts = loader.load(&[id]).await?;
-        Ok(posts.get(&id).cloned())
+        let loader = ctx.data_unchecked::<DataLoader<PostLoader>>();
+        let post = loader.load_one(id).await?;
+        Ok(post)
     }
 
     async fn users(
@@ -58,22 +48,33 @@ impl Query {
         ctx: &Context<'_>,
         id: i32,
     ) -> std::result::Result<Option<User>, async_graphql::Error> {
-        let loader = ctx.data_unchecked::<UserLoader>();
-        let users = loader.load(&[id]).await?;
-        Ok(users.get(&id).cloned())
+        let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
+        let user = loader.load_one(id).await?;
+        Ok(user)
     }
 }
 
 #[derive(SimpleObject, Serialize, Deserialize, Debug, Clone)]
-// #[graphql(complex)]
 #[serde(rename_all = "camelCase")]
+#[graphql(complex)]
 struct Post {
     id: Option<i32>,
     #[graphql(name = "userId")]
     user_id: i32,
     title: Option<String>,
     body: Option<String>,
-    user: Option<User>,
+}
+
+#[ComplexObject]
+impl Post {
+    async fn user(
+        &self,
+        ctx: &Context<'_>,
+    ) -> std::result::Result<Option<User>, async_graphql::Error> {
+        let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
+        let user = loader.load_one(self.user_id).await?;
+        Ok(user)
+    }
 }
 
 #[derive(SimpleObject, Serialize, Deserialize, Debug, Clone)]
@@ -99,8 +100,6 @@ struct Geo {
     lng: Option<f64>,
 }
 
-use async_graphql::dataloader::Loader;
-
 struct PostLoader(Arc<Client>);
 struct UserLoader(Arc<Client>);
 
@@ -115,7 +114,7 @@ impl Loader<i32> for PostLoader {
         let mut result = std::collections::HashMap::new();
         for &id in keys {
             let url = format!("{}/posts/{}", BASE_URL, id);
-            // println!("http request: {}", url);
+            println!("[Finder]: url={}", url);
             let response = self.0.get(url).send().await?;
             if response.status().is_success() {
                 let post: Post = response.json().await?;
@@ -135,13 +134,13 @@ impl Loader<i32> for UserLoader {
         keys: &[i32],
     ) -> std::result::Result<std::collections::HashMap<i32, Self::Value>, Self::Error> {
         let mut result = std::collections::HashMap::new();
-
         let qp = keys
             .iter()
             .map(|id| format!("id={}", id))
             .collect::<Vec<_>>()
             .join("&");
         let url = format!("{}/users?{}", BASE_URL, qp);
+        println!("[Finder]: url={}", url);
         let response = self.0.get(url).send().await?;
         if response.status().is_success() {
             let users: Vec<User> = response.json().await?;
@@ -157,10 +156,14 @@ impl Loader<i32> for UserLoader {
 
 fn create_schema() -> Schema<Query, EmptyMutation, EmptySubscription> {
     let client = Arc::new(Client::new());
+    let user_loader =
+        DataLoader::new(UserLoader(client.clone()), tokio::spawn).delay(Duration::from_millis(1));
+    let post_loader =
+        DataLoader::new(PostLoader(client.clone()), tokio::spawn).delay(Duration::from_millis(1));
     Schema::build(Query, EmptyMutation, EmptySubscription)
-        .data(client.clone())
-        .data(UserLoader(client.clone()))
-        .data(PostLoader(client.clone()))
+        .data(client)
+        .data(user_loader)
+        .data(post_loader)
         .finish()
 }
 
