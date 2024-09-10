@@ -1,10 +1,21 @@
-use std::{path::PathBuf, sync::LazyLock};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    sync::LazyLock,
+};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 use tokio::{fs, io::AsyncWriteExt};
 use tracing::{info, instrument};
 
 use crate::{command::Command, ROOT_DIR};
+
+#[derive(Serialize, Deserialize)]
+struct Stats {
+    rps: u64,
+}
 
 static BENCHES: LazyLock<Result<Vec<String>>> = LazyLock::new(|| {
     let tests_path = format!("{ROOT_DIR}/benches");
@@ -28,16 +39,14 @@ static BENCHES: LazyLock<Result<Vec<String>>> = LazyLock::new(|| {
 });
 
 #[instrument(skip_all)]
-pub async fn run_benchmarks(project: &str) -> Result<()> {
+pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
     info!("Starting benchmark");
     let mut mock_path = PathBuf::from(ROOT_DIR);
     mock_path.push("benchmark.sh");
 
-    let mut output_path = PathBuf::from(ROOT_DIR);
-    output_path.push("results");
-    output_path.push(&project);
-
     fs::create_dir_all(&output_path).await?;
+
+    let mut stats = BTreeMap::new();
 
     for bench_name in BENCHES
         .as_ref()
@@ -56,17 +65,52 @@ pub async fn run_benchmarks(project: &str) -> Result<()> {
             String::from_utf8_lossy(&output.stdout)
         );
 
-        let output_path = output_path.join(format!("{bench_name}.out"));
+        let out_path = output_path.join(format!("{bench_name}.out"));
 
         let mut file = fs::OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
-            .open(output_path)
+            .open(out_path)
             .await?;
 
-        file.write_all(&output.stdout).await?;
+        let stdout = &output.stdout;
+
+        file.write_all(stdout).await?;
+
+        let single_stats = parse_wrk(stdout)?;
+
+        stats.insert(bench_name.to_string(), single_stats);
     }
 
+    let json_path = output_path.join(format!("stats.json"));
+
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(json_path)
+        .await?;
+
+    file.write_all(serde_json::to_string_pretty(&stats)?.as_bytes())
+        .await?;
+
     Ok(())
+}
+
+fn parse_wrk(output: &Vec<u8>) -> Result<Stats> {
+    let output_str = String::from_utf8_lossy(output);
+
+    // only the integer part of rps
+    let re = Regex::new(r"Requests/sec:\s+(\d+)")?;
+
+    let rps = if let Some(caps) = re.captures(&output_str) {
+        let rps = &caps[1];
+
+        rps.parse()?
+    } else {
+        bail!("Failed to parse wrk output");
+    };
+
+    Ok(Stats { rps })
 }
