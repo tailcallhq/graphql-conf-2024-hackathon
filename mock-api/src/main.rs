@@ -23,9 +23,14 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    // The delay is expressed in milliseconds
+    // Used to add a delay for each request
+    // with the aim to "simulate" real world
     let delay = env_default("MOCK_SERVER_DELAY", 5);
     let delay = Duration::from_millis(delay);
 
+    // Number of requests the server can handle in a given moment
+    // after that number the server triggers rate-limiting
     let burst_size = env_default("MOCK_SERVER_BURST_SIZE", 1000);
 
     let rate_limiter_config = Arc::new(
@@ -37,8 +42,10 @@ async fn main() {
             .unwrap(),
     );
 
+    // Shared state of the API, used to keep the data that will be served
     let state = Arc::new(AppState::default());
 
+    // The router and the available endpoints
     let mut router = Router::new()
         .route(
             "/",
@@ -50,6 +57,7 @@ async fn main() {
         .route("/users/:user_id", get(mock_api::routes::get_user::handle))
         .route("/reset", post(mock_api::routes::reset_database::handle))
         .layer(axum::middleware::from_fn(
+            // This middleware is responsible to apply the delay functionality
             move |request: Request, next: Next| {
                 let delay = delay.clone();
                 async move {
@@ -61,6 +69,7 @@ async fn main() {
         ))
         .with_state(state);
 
+    // Check if rate limiting is enabled and apply it
     if env_default("MOCK_SERVER_LIMITER_ENABLED", false) {
         router = router.layer(GovernorLayer {
             config: rate_limiter_config,

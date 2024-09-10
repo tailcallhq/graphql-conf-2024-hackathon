@@ -5,6 +5,8 @@ use serde_json::json;
 
 use crate::{PostData, UserData};
 
+/// Helper struct that is used to store the data
+/// for the responses
 pub struct Database {
     user_template: serde_json::Value,
     post_template: serde_json::Value,
@@ -23,6 +25,7 @@ fn geo_add_fractional_part(val: &mut f64) {
 }
 
 impl Database {
+    /// Initialize the database with random data
     pub fn new() -> Self {
         Self {
             user_template: json!({
@@ -51,6 +54,7 @@ impl Database {
         }
     }
 
+    /// Used to reset the database and generate new data
     pub fn reset(&self) -> Result<(), anyhow::Error> {
         // clear the previous data from database.
         self.users
@@ -91,18 +95,22 @@ impl Database {
         Ok(())
     }
 
+    /// Used to get all posts
     pub fn posts(&self) -> Vec<PostData> {
         self.posts.lock().unwrap().values().cloned().collect()
     }
 
+    /// Used to get a post
     pub fn post(&self, id: i64) -> Option<PostData> {
         self.posts.lock().unwrap().get(&id).cloned()
     }
 
+    /// Used to get all users
     pub fn users(&self) -> Vec<UserData> {
         self.users.lock().unwrap().values().cloned().collect()
     }
 
+    /// Used to get a user
     pub fn user(&self, id: i64) -> Option<UserData> {
         self.users.lock().unwrap().get(&id).cloned()
     }

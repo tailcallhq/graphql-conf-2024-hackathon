@@ -8,6 +8,7 @@ use axum::{
 
 use crate::{AppError, AppState};
 
+/// route handler for getting a post
 pub async fn handle(
     state: State<Arc<AppState>>,
     post_id: Path<i64>,
