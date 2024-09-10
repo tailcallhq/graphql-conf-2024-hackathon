@@ -1,11 +1,13 @@
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
+    str::FromStr,
     sync::LazyLock,
 };
 
 use anyhow::{anyhow, bail, Context, Result};
 use regex::Regex;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tokio::{fs, io::AsyncWriteExt};
 use tracing::{info, instrument};
@@ -14,7 +16,22 @@ use crate::{command::Command, ROOT_DIR};
 
 #[derive(Serialize, Deserialize)]
 struct Stats {
-    rps: u64,
+    latency_avg: String,
+    latency_stdev: String,
+    latency_max: String,
+    latency_stdev_percent: Decimal,
+    rps_avg: Decimal,
+    rps_stdev: Decimal,
+    rps_max: Decimal,
+    rps_stdev_percent: Decimal,
+    total_requests: u64,
+    memory: Decimal,
+    connect_errors: u64,
+    read_errors: u64,
+    write_errors: u64,
+    timeout_errors: u64,
+    rps: Decimal,
+    tps: Decimal,
 }
 
 static BENCHES: LazyLock<Result<Vec<String>>> = LazyLock::new(|| {
@@ -101,16 +118,121 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
 fn parse_wrk(output: &Vec<u8>) -> Result<Stats> {
     let output_str = String::from_utf8_lossy(output);
 
-    // only the integer part of rps
-    let re = Regex::new(r"Requests/sec:\s+(\d+)")?;
+    let latency_avg = parse_string(
+        &output_str,
+        Regex::new(r"Latency\s+(\d+.?\d+[a-z]+)\s+\d+.?\d+[a-z]+\s+\d+.?\d+[a-z]+\s+\d+.?\d+%")?,
+    )?;
+    let latency_stdev = parse_string(
+        &output_str,
+        Regex::new(r"Latency\s+\d+.?\d+[a-z]+\s+(\d+.?\d+[a-z]+)\s+\d+.?\d+[a-z]+\s+\d+.?\d+%")?,
+    )?;
+    let latency_max = parse_string(
+        &output_str,
+        Regex::new(r"Latency\s+\d+.?\d+[a-z]+\s+\d+.?\d+[a-z]+\s+(\d+.?\d+[a-z]+)\s+\d+.?\d+%")?,
+    )?;
+    let latency_stdev_percent = parse_decimal(
+        &output_str,
+        Regex::new(r"Latency\s+\d+.?\d+[a-z]+\s+\d+.?\d+[a-z]+\s+\d+.?\d+[a-z]+\s+(\d+.?\d+)%")?,
+    )?;
+    let rps_avg = parse_decimal(
+        &output_str,
+        Regex::new(r"Req\/Sec\s+(\d+.?\d+)\s+\d+.?\d+\s+\d+.?\d+\s+\d+.?\d+%")?,
+    )?;
+    let rps_stdev = parse_decimal(
+        &output_str,
+        Regex::new(r"Req\/Sec\s+\d+.?\d+\s+(\d+.?\d+)\s+\d+.?\d+\s+\d+.?\d+%")?,
+    )?;
+    let rps_max = parse_decimal(
+        &output_str,
+        Regex::new(r"Req\/Sec\s+\d+.?\d+\s+\d+.?\d+\s+(\d+.?\d+)\s+\d+.?\d+%")?,
+    )?;
+    let rps_stdev_percent = parse_decimal(
+        &output_str,
+        Regex::new(r"Req\/Sec\s+\d+.?\d+\s+\d+.?\d+\s+\d+.?\d+\s+(\d+.?\d+)%")?,
+    )?;
 
-    let rps = if let Some(caps) = re.captures(&output_str) {
-        let rps = &caps[1];
+    let total_requests = parse_u64(
+        &output_str,
+        Regex::new(r"(\d+)\s+requests\s+in\s+\d+.?\d+s,\s+\d+.?\d+")?,
+    )?;
+    let memory = parse_decimal(
+        &output_str,
+        Regex::new(r"\d+\s+requests\s+in\s+\d+.?\d+s,\s+(\d+.?\d+)")?,
+    )?;
+    let connect_errors = parse_u64(
+        &output_str,
+        Regex::new(
+            r"Socket\s+errors:\s+connect\s+\d+,\s+read\s+\d+.\s+write\s+\d+.\s+timeout\s+\d+",
+        )?,
+    )
+    .unwrap_or(0);
+    let read_errors = parse_u64(
+        &output_str,
+        Regex::new(
+            r"Socket\s+errors:\s+connect\s+(\d+),\s+read\s+\d+.\s+write\s+\d+.\s+timeout\s+\d+",
+        )?,
+    )
+    .unwrap_or(0);
+    let write_errors = parse_u64(
+        &output_str,
+        Regex::new(
+            r"Socket\s+errors:\s+connect\s+\d+,\s+read\s+(\d+).\s+write\s+\d+.\s+timeout\s+\d+",
+        )?,
+    )
+    .unwrap_or(0);
+    let timeout_errors = parse_u64(
+        &output_str,
+        Regex::new(
+            r"Socket\s+errors:\s+connect\s+\d+,\s+read\s+\d+.\s+write\s+(\d+).\s+timeout\s+(\d+)",
+        )?,
+    )
+    .unwrap_or(0);
+    let rps = parse_decimal(&output_str, Regex::new(r"Requests\/sec:\s+(\d+.?\d+)")?)?;
+    let tps = parse_decimal(&output_str, Regex::new(r"Transfer\/sec:\s+(\d+.?\d+)")?)?;
 
-        rps.parse()?
+    Ok(Stats {
+        latency_avg,
+        latency_stdev,
+        latency_max,
+        latency_stdev_percent,
+        rps_avg,
+        rps_stdev,
+        rps_max,
+        rps_stdev_percent,
+        total_requests,
+        memory,
+        connect_errors,
+        read_errors,
+        write_errors,
+        timeout_errors,
+        rps,
+        tps,
+    })
+}
+
+fn parse_decimal(data: &str, re: Regex) -> anyhow::Result<Decimal> {
+    if let Some(caps) = re.captures(data) {
+        let value = &caps[1];
+        Ok(Decimal::from_str(value)?)
     } else {
-        bail!("Failed to parse wrk output");
-    };
+        bail!("Failed to parse {:?}", re)
+    }
+}
 
-    Ok(Stats { rps })
+fn parse_u64(data: &str, re: Regex) -> anyhow::Result<u64> {
+    if let Some(caps) = re.captures(data) {
+        let value = &caps[1];
+        Ok(value.parse()?)
+    } else {
+        bail!("Failed to parse {:?}", re)
+    }
+}
+
+fn parse_string(data: &str, re: Regex) -> anyhow::Result<String> {
+    if let Some(caps) = re.captures(data) {
+        let value = &caps[1];
+        Ok(value.to_string())
+    } else {
+        bail!("Failed to parse {:?}", re)
+    }
 }
