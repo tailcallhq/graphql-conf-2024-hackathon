@@ -7,33 +7,33 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, RwLock}, // Change Mutex to RwLock
     time::Duration,
 };
 
 const BASE_URL: &str = "http://localhost:3000";
 
 struct Store {
-    post: Mutex<HashMap<i32, Post>>,
-    users: Mutex<HashMap<i32, User>>,
-    is_post_same: Mutex<bool>,
+    post: RwLock<HashMap<i32, Post>>,  // Change Mutex to RwLock
+    users: RwLock<HashMap<i32, User>>, // Change Mutex to RwLock
+    is_post_same: RwLock<bool>,        // Change Mutex to RwLock
 }
 
 impl Default for Store {
     fn default() -> Self {
         Self {
-            post: Mutex::new(HashMap::default()),
-            users: Mutex::new(HashMap::default()),
-            is_post_same: Mutex::new(false),
+            post: RwLock::new(HashMap::default()), // Change Mutex to RwLock
+            users: RwLock::new(HashMap::default()), // Change Mutex to RwLock
+            is_post_same: RwLock::new(false),      // Change Mutex to RwLock
         }
     }
 }
 
 impl Store {
     pub fn reset(&self) {
-        self.users.lock().unwrap().clear();
-        self.post.lock().unwrap().clear();
-        *self.is_post_same.lock().unwrap() = false;
+        self.users.write().unwrap().clear(); // Change lock to write()
+        self.post.write().unwrap().clear(); // Change lock to write()
+        *self.is_post_same.write().unwrap() = false; // Change lock to write()
     }
 }
 
@@ -53,26 +53,41 @@ impl Query {
         let store = ctx.data_unchecked::<Arc<Store>>();
 
         let is_same = {
-            let cached_post = store.post.lock().unwrap();
-            let post1_exists = cached_post
-                .get(&posts[1].id.unwrap())
-                .map(|post1| *post1 == posts[1])
-                .unwrap_or(false);
-            let post2_exists = cached_post
-                .get(&posts[2].id.unwrap())
-                .map(|post2| post2 == &posts[2])
-                .unwrap_or(false);
+            // TODO: pick these ID's randomly to reduce the chance of false positives.
+            let are_posts_same = {
+                let cached_post = store.post.read().unwrap();
+                let post1_exists = cached_post
+                    .get(&posts[1].id.unwrap())
+                    .map(|post1| *post1 == posts[1])
+                    .unwrap_or(false);
+                let post2_exists = cached_post
+                    .get(&posts[2].id.unwrap())
+                    .map(|post2| post2 == &posts[2])
+                    .unwrap_or(false);
 
-            if post1_exists && post2_exists {
+                post1_exists && post2_exists
+            };
+
+            if are_posts_same {
                 true
             } else {
                 store.reset();
+                store
+                    .post
+                    .write()
+                    .unwrap()
+                    .insert(posts[1].id.unwrap(), posts[1].clone());
+                store
+                    .post
+                    .write()
+                    .unwrap()
+                    .insert(posts[2].id.unwrap(), posts[2].clone());
                 false
             }
         };
 
         {
-            let mut is_post_same = store.is_post_same.lock().unwrap();
+            let mut is_post_same = store.is_post_same.write().unwrap();
             *is_post_same = is_same;
         }
 
@@ -89,7 +104,7 @@ impl Query {
         if let Some(actual_post) = post.as_ref() {
             // cache the post early
             let store = ctx.data_unchecked::<Arc<Store>>();
-            store.post.lock().unwrap().insert(id, actual_post.clone());
+            store.post.write().unwrap().insert(id, actual_post.clone());
         }
         Ok(post)
     }
@@ -116,7 +131,7 @@ impl Query {
         if let Some(actual_user) = &user {
             // cache the user early
             let store = ctx.data_unchecked::<Arc<Store>>();
-            store.users.lock().unwrap().insert(id, actual_user.clone());
+            store.users.write().unwrap().insert(id, actual_user.clone());
         }
 
         Ok(user)
@@ -141,16 +156,16 @@ impl Post {
         ctx: &Context<'_>,
     ) -> std::result::Result<Option<User>, async_graphql::Error> {
         let store = ctx.data_unchecked::<Arc<Store>>();
-        if *store.is_post_same.lock().unwrap()
-            && store.users.lock().unwrap().contains_key(&self.user_id)
+        if *store.is_post_same.read().unwrap()
+            && store.users.read().unwrap().contains_key(&self.user_id)
         {
-            let user = store.users.lock().unwrap().get(&self.user_id).cloned();
+            let user = store.users.write().unwrap().get(&self.user_id).cloned();
             Ok(user)
         } else {
             let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
             let user = loader.load_one(self.user_id).await?;
             if let Some(actual_user) = user.as_ref() {
-                let mut user_store = store.users.lock().unwrap();
+                let mut user_store = store.users.write().unwrap();
                 user_store.insert(self.user_id, actual_user.clone());
             }
             Ok(user)
