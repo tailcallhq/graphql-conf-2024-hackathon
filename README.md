@@ -64,7 +64,8 @@ type Geo {
 ## And Some More...
 
 - We might add new tests and modify the existing ones to ensure its there is no hardcoding and its a level playing field for all.
-- If you questions or doubts about the hackathon, connect with us on [Discord] or [Twitter] or the only two people in that bright yellow T-Shirt they'd be glad to say 👋.
+- If you questions or doubts about the hackathon, connect with us on [Discord](
+https://discord.gg/GJHMeZup8m) or [X](https://x.com/tailcallhq) or the only two people in that bright yellow T-Shirt they'd be glad to say 👋.
 
 Here's a clearer explanation of the scoring calculation for the hackathon:
 
