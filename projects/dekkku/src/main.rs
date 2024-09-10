@@ -115,7 +115,7 @@ impl Loader<i32> for PostLoader {
         let mut result = std::collections::HashMap::new();
         for &id in keys {
             let url = format!("{}/posts/{}", BASE_URL, id);
-            println!("http request: {}", url);
+            // println!("http request: {}", url);
             let response = self.0.get(url).send().await?;
             if response.status().is_success() {
                 let post: Post = response.json().await?;
@@ -142,7 +142,6 @@ impl Loader<i32> for UserLoader {
             .collect::<Vec<_>>()
             .join("&");
         let url = format!("{}/users?{}", BASE_URL, qp);
-        println!("http request: {}", url);
         let response = self.0.get(url).send().await?;
         if response.status().is_success() {
             let users: Vec<User> = response.json().await?;
@@ -178,7 +177,6 @@ async fn main() -> anyhow::Result<()> {
     let app = Route::new()
         .at("/graphql", get(graphiql).post(GraphQL::new(schema.clone())))
         .at("/", get(graphiql).post(GraphQL::new(schema.clone())));
-    println!("GraphiQL: http://localhost:8000/graphql");
     Server::new(TcpListener::bind("0.0.0.0:8000"))
         .run(app)
         .await?;
