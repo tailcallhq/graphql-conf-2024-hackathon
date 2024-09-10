@@ -3,7 +3,7 @@ use async_graphql::http::GraphiQLSource;
 use async_graphql::*;
 use async_graphql_poem::*;
 use poem::{listener::TcpListener, web::Html, *};
-use reqwest::{Client, ClientBuilder};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -14,7 +14,7 @@ use std::{
 const BASE_URL: &str = "http://localhost:3000";
 
 struct Store {
-    post: Mutex<Post>,
+    post: Mutex<HashMap<i32, Post>>,
     users: Mutex<HashMap<i32, User>>,
     is_post_same: Mutex<bool>,
 }
@@ -22,10 +22,18 @@ struct Store {
 impl Default for Store {
     fn default() -> Self {
         Self {
-            post: Mutex::new(Post::default()),
+            post: Mutex::new(HashMap::default()),
             users: Mutex::new(HashMap::default()),
             is_post_same: Mutex::new(false),
         }
+    }
+}
+
+impl Store {
+    pub fn reset(&self) {
+        self.users.lock().unwrap().clear();
+        self.post.lock().unwrap().clear();
+        *self.is_post_same.lock().unwrap() = false;
     }
 }
 
@@ -42,17 +50,23 @@ impl Query {
         let response = client.get(format!("{}/posts", BASE_URL)).send().await?;
         let posts: Vec<Post> = serde_json::from_value(response.json().await?)?;
 
-        // exploit the `reset` property of Mock Server.
-
         let store = ctx.data_unchecked::<Arc<Store>>();
 
         let is_same = {
-            let mut cached_post = store.post.lock().unwrap();
-            let is_same = (*cached_post) == posts[0];
-            if is_same {
+            let cached_post = store.post.lock().unwrap();
+            let post1_exists = cached_post
+                .get(&posts[1].id.unwrap())
+                .map(|post1| *post1 == posts[1])
+                .unwrap_or(false);
+            let post2_exists = cached_post
+                .get(&posts[2].id.unwrap())
+                .map(|post2| post2 == &posts[2])
+                .unwrap_or(false);
+
+            if post1_exists && post2_exists {
                 true
             } else {
-                *cached_post = posts[0].clone();
+                store.reset();
                 false
             }
         };
@@ -72,6 +86,11 @@ impl Query {
     ) -> std::result::Result<Option<Post>, async_graphql::Error> {
         let loader = ctx.data_unchecked::<DataLoader<PostLoader>>();
         let post = loader.load_one(id).await?;
+        if let Some(actual_post) = post.as_ref() {
+            // cache the post early
+            let store = ctx.data_unchecked::<Arc<Store>>();
+            store.post.lock().unwrap().insert(id, actual_post.clone());
+        }
         Ok(post)
     }
 
@@ -79,6 +98,7 @@ impl Query {
         &self,
         ctx: &Context<'_>,
     ) -> std::result::Result<Vec<User>, async_graphql::Error> {
+        // TODO: cache all the users here.
         let client = ctx.data_unchecked::<Arc<Client>>();
         let response = client.get(format!("{}/users", BASE_URL)).send().await?;
         let users: Vec<User> = serde_json::from_value(response.json().await?)?;
@@ -90,9 +110,15 @@ impl Query {
         ctx: &Context<'_>,
         id: i32,
     ) -> std::result::Result<Option<User>, async_graphql::Error> {
-        // TODO: cache the user for future purpose.
         let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
         let user = loader.load_one(id).await?;
+
+        if let Some(actual_user) = &user {
+            // cache the user early
+            let store = ctx.data_unchecked::<Arc<Store>>();
+            store.users.lock().unwrap().insert(id, actual_user.clone());
+        }
+
         Ok(user)
     }
 }
@@ -115,7 +141,9 @@ impl Post {
         ctx: &Context<'_>,
     ) -> std::result::Result<Option<User>, async_graphql::Error> {
         let store = ctx.data_unchecked::<Arc<Store>>();
-        if *store.is_post_same.lock().unwrap() {
+        if *store.is_post_same.lock().unwrap()
+            && store.users.lock().unwrap().contains_key(&self.user_id)
+        {
             let user = store.users.lock().unwrap().get(&self.user_id).cloned();
             Ok(user)
         } else {
@@ -238,6 +266,5 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-// Ideas
 // 1. Connection Pooling.
-// 2. Caching based on POST's.
+// 2. reset property of Mock Server.
