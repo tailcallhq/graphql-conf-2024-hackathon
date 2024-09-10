@@ -23,7 +23,7 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let delay = env_default("MOCK_SERVER_DELAY", 50);
+    let delay = env_default("MOCK_SERVER_DELAY", 5);
     let delay = Duration::from_millis(delay);
 
     let burst_size = env_default("MOCK_SERVER_BURST_SIZE", 1000);
