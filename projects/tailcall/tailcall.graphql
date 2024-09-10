@@ -1,5 +1,5 @@
 schema
-  @server(port: 8089)
+  @server(port: 8000)
   @upstream(baseURL: "http://localhost:3000") {
   query: Query
 }
