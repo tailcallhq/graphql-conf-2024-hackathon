@@ -5,17 +5,11 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
-clap = { version = "4.5.17", features = ["derive"] }
-command-group = { version = "5.0.1", features = ["with-tokio"] }
-diff_logger = "0.1.0"
 easy_retry = { version = "0.1.0", features = ["async"] }
-mock_json = "0.1.8"
 reqwest = { version = "0.12.7", features = ["json"] }
 serde_json = "1.0.127"
 serde = "1.0.127"
 tokio = { version = "1.40.0", features = ["full"] }
-tracing = "0.1.40"
-tracing-subscriber = "0.3.18"
 async-graphql = "7.0.8"
 async-graphql-poem = "7.0.9"
 poem = "3.1.0"
