@@ -11,6 +11,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  benchmarks_stub:
+    name: Run benchmarks for pr
+    if: "${{ !contains(github.event.pull_request.labels.*.name, 'ci: benchmark') }}"
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Fake job if label is not set"
+
   benchmarks:
     name: Run benchmarks for pr
     if: "${{ contains(github.event.pull_request.labels.*.name, 'ci: benchmark') }}"
