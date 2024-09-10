@@ -1,0 +1,11 @@
+{
+  "posts-nested": {
+    "rps": 5951
+  },
+  "posts-title": {
+    "rps": 12018
+  },
+  "posts-with-user": {
+    "rps": 5798
+  }
+}

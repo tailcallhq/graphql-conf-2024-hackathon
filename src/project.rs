@@ -1,6 +1,9 @@
 use anyhow::{anyhow, Result};
 use easy_retry::EasyRetry;
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use tracing::{error, info, instrument};
 
 use crate::{
@@ -51,13 +54,29 @@ impl Project {
         let server = self.run_server().await?;
 
         run_graphql_tests().await?;
-        run_benchmarks(self.name()).await?;
+        run_benchmarks(&Path::new(ROOT_DIR).join(format!("results/{}", self.name()))).await?;
         run_graphql_tests().await?;
 
-        mock_server.kill().await?;
-        reference_server.kill().await?;
         info!("Kill the server process");
         server.kill().await?;
+        reference_server.kill().await?;
+        mock_server.kill().await?;
+
+        Ok(())
+    }
+
+    #[instrument(skip_all)]
+    pub async fn run_baseline(self) -> Result<()> {
+        info!("Starting baseline project");
+
+        let mock_server = self.run_mock_server().await?;
+        let server = self.run_server().await?;
+
+        run_benchmarks(&Path::new(ROOT_DIR).join("reference/results")).await?;
+
+        info!("Kill the server process");
+        server.kill().await?;
+        mock_server.kill().await?;
 
         Ok(())
     }
