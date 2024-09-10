@@ -25,6 +25,7 @@ type User {
   address: Address
   phone: String
   website: String
+  posts: [Post]
 }
 
 type Address {

@@ -1,90 +1,123 @@
 # 🚀 GraphQL Conf Hackathon 2024
 
-## Overview
+Get ready for an adrenaline-pumping, 3-day coding marathon where your mission is clear: **Build the fastest, most resilient GraphQL server** and prove you can **beat Tailcall's performance!**
 
-Welcome to the GraphQL Hackathon 2024, where you will implement a GraphQL server that resolves data from upstream REST APIs! Your mission is to implement the GraphQL schema provided below, efficiently resolving queries while ensuring high performance and correctness.
+**When?**
 
-**Challenge**: Build a GraphQL server that:
+- **Start Date:** 10th September 2024, 8:00 AM PDT
+- **End Date:** 12th September 2024, 4:00 PM PDT
 
-- Resolves data from upstream REST APIs.
-- Implements the provided GraphQL schema.
-- Handles real-world performance scenarios (e.g., multiple requests, nested resolvers).
-- The fastest and most reliable implementation wins the top prize!
-
-## Challenge Details
-
-### Objective
-
-Participants must implement a GraphQL API that resolves data from an upstream REST API, provided by the organizers. The data must be resolved according to the predefined schema, and the server must perform well under stress.
-
-### Predefined Schema
-
-The GraphQL schema that you need to implement is specified in the [schema.graphql](./schema.graphql) in the root of this repository.
-
-### Data Source (Upstream REST API)
-
-Your GraphQL server will need to fetch data from the upstream REST API at:
-
-**Base URL**: `http://localhost:3000`
-
-Endpoints:
-
-- /posts (returns a list of posts)
-- /posts/:id (returns a post by ID)
-- /users (returns a list of users)
-- /users/:id (returns a user by ID)
-
-The structure of the REST API responses will match the GraphQL schema fields.
-
-### GraphQL server
-
-Your GraphQL server should start on url `http://localhost:8000/graphql` and serve `POST` Graphql requests on it.
-
-### Rules
-
-- Participant's implementation should follow stated [objective](#objective)
-- The solution should be provided as pull-request to this repo from participant's fork
-- The pull-request should contain only file additions inside `/projects/${participant_name}` without changes in the other repo files or other participants code
-- The solution could be implemented in any language or framework or using specific tools within the scope of the licence granted by used tools. The only prohibition is  the use of the [tailcall](https://github.com/tailcallhq/tailcall/) tool
-- The solution should contain all source code and setup that is required to understand how the solution was achieved and how to run it
-- Cooperation on single solution is acceptable, but only the author of the pr will be eligible to win the prize
-- In case of the multiple solutions with identical code will be candidates for prize only the solution that was added first will be eligible for prize
+This is more than just a competition—it's a race against time, a test of skill, and your chance to make some real money at the conf. The clock is ticking. Are you ready to outcode, outthink, and outperform? Let's do this!
 
 ## Getting Started
 
-1. Fork this repository
-2. Clone the repository locally or run the codespace of your choice
-3. Add new folder to `./projects` folder with your username. Copy the `/template` folder content from the repository root to your folder to populate required files.
-4. Add the code of the implementation inside the folder
-	- you could use any language or tool by your choice that allows you to create the required GraphQL server. Just make sure the solution could be replicated in Github Actions environment
-	- follow requirements from [Challenge Details](#challenge-details)
-	- use the `schema.graphql` file from the root of the repo. Feel free to copy the file to your folder and change it the way you needed to work properly, but don't change the structure of types
-5. Add `run.sh` file that installs required tools and runs the server
-	- the script is running on [Github Hosted runner](https://docs.github.com/en/actions/using-github-hosted-runners/using-github-hosted-runners/about-github-hosted-runners). List of available tools and packages could be found [here](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md)
-	- first add installation and build steps for required tools and code. E.g. `npm i` or `cargo build --release`
-	- add steps to start the server. E.g. `npm start` or `cargo run --release`
-	- make sure the script is marked as executable `chmod +x run.sh`
-6. Make sure your code is working and handles GraphQL requests
-7. Commit and push changes to your fork
-8. Create a pull request from your fork into original repository
+Support the following GraphQL schema:
 
-## How implementation is checked
+```graphql
+schema {
+  query: Query
+}
 
-1. Build everything that is required to run test environment and custom implementation
-2. Start the test environment to validate response: mock server and reference server that is used to test implementation correctness
-3. Run correctness tests
-4. Run the benchmark
-5. Run correctness tests again
+type Query {
+  posts: [Post]
+  post(id: Int!): Post
+  users: [User]
+  user(id: Int!): User
+}
 
-### Testing correctness
+type Post {
+  id: Int
+  userId: Int!
+  title: String
+  body: String
+  user: User
+}
 
-For testing the correctness repeat next process multiple times:
+type User {
+  id: Int
+  name: String
+  username: String
+  email: String
+  address: Address
+  phone: String
+  website: String
+  posts: [Post]
+}
 
-1. Regenerate mocks on mock-api server
-2. For every request in `/tests` directory execute the request to user implementation
-3. Execute the same request for reference implementation
-4. Compare the results and in case they are mismatch throw an error
+type Address {
+  zipcode: String
+  geo: Geo
+}
 
-### Benchmarking the performance
+type Geo {
+  lat: Float
+  lng: Float
+}
+```
 
-Ran many requests in parallel to the server with tools like `wrk` or `k6` to collect info about provided RPS and latency
+## Technical Requirements
+
+1. All CI tests should pass.
+2. Your implementation should be under the `/projects` directory.
+3. Should support any query that is supported by the schema.
+
+## And Some More...
+
+- We might add new tests and modify the existing ones to ensure there is no hardcoding and it's a level playing field for all.
+- If you have questions or doubts about the hackathon, connect with us on [Discord](https://discord.gg/GJHMeZup8m) or [X](https://x.com/tailcallhq) or the only two people in that bright yellow T-shirt they'd be glad to say 👋.
+
+Here's a clearer explanation of the scoring calculation for the hackathon:
+
+### Scoring
+
+1. **Test Execution:**
+
+   - For every commit, a set of predefined tests and benchmarks are executed. These tests are located in the `./tests` directory.
+
+2. **Throughput Normalization:**
+
+   - Your performance is measured in terms of requests per second (RPS) for each query.
+   - This performance is then compared to Tailcall's RPS for the same query.
+   - The comparison is done by dividing your RPS by Tailcall's RPS. This gives a normalized score for each query.
+
+   **Example:**
+
+   - For the `posts-title` query:
+     - If your RPS is `100` and Tailcall's RPS is `50`, the normalized score for this query would be `100/50 = 2.0`.
+
+3. **Final Score Calculation:**
+
+   - The normalized scores for all queries are averaged.
+   - The final score is this average multiplied by 1000.
+
+   **Example:**
+
+   - Given the following scores:
+     | Query | Your RPS | Tailcall RPS | Normalized |
+     | ----------------- | -------- | ------------ | ---------- |
+     | `posts-nested` | 100 | 50 | 2.0 |
+     | `posts-title` | 200 | 350 | 0.8 |
+     | `posts-with-user` | 300 | 250 | 1.2 |
+
+   - The average normalized score is `(2.0 + 0.8 + 1.2) / 3 = 1.33`.
+   - The final score would be `1.33 * 1000 = 1,333.33`.
+
+## FAQs
+
+**How do I submit my solution?**  
+Submit your solution as a pull request (PR) from your forked repo to the main repo.
+
+**What should my PR include?**  
+Your PR should only include file additions inside `/projects/${participant_name}`. Don’t change any other files or code belonging to other participants.
+
+**Can I use any language or tools?**  
+Yes, you can use any language, framework, or tools as long as they’re within the scope of the licenses. However, the [tailcall](https://github.com/tailcallhq/tailcall/) tool is not allowed.
+
+**What should be included in the solution?**  
+Your solution should include all the source code and setup instructions necessary to understand how you achieved the solution and how to run it.
+
+**Can I work with others on the solution?**  
+Yes, you can collaborate, but only the person who submits the PR will be eligible to win the prize.
+
+**What if there are multiple solutions with identical code?**  
+Any kind of plagiarism will result in a ban, Check our [guidelines](https://tailcall.run/docs/contributors/bounty/#identifying-plagiarism) on plagiarism for more.
