@@ -1,5 +1,6 @@
 use std::{
     collections::BTreeMap,
+    ops::{Deref, DerefMut},
     path::{Path, PathBuf},
     str::FromStr,
     sync::LazyLock,
@@ -55,6 +56,39 @@ static BENCHES: LazyLock<Result<Vec<String>>> = LazyLock::new(|| {
     Ok(tests)
 });
 
+#[derive(Serialize, Deserialize, Default)]
+struct AllStats(BTreeMap<String, Stats>);
+
+impl Deref for AllStats {
+    type Target = BTreeMap<String, Stats>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for AllStats {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl AllStats {
+    fn score(&self, baseline: &AllStats) -> Result<u64> {
+        let mut sum: u64 = 0;
+
+        for (key, stats) in &self.0 {
+            let baseline_stats = baseline
+                .get(key)
+                .context("Cannot find specific key in baseline stats")?;
+
+            sum += 1000 * stats.rps / baseline_stats.rps;
+        }
+
+        Ok(sum / self.len() as u64)
+    }
+}
+
 #[instrument(skip_all)]
 pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
     info!("Starting benchmark");
@@ -63,7 +97,11 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
 
     fs::create_dir_all(&output_path).await?;
 
-    let mut stats = BTreeMap::new();
+    let baseline_stats: AllStats = serde_json::from_str(
+        &fs::read_to_string(Path::new(ROOT_DIR).join("reference/results/stats.json")).await?,
+    )?;
+
+    let mut stats = AllStats::default();
 
     for bench_name in BENCHES
         .as_ref()
@@ -120,6 +158,18 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
         .await?;
 
     file.write_all(serde_json::to_string_pretty(&stats)?.as_bytes())
+        .await?;
+
+    let score = output_path.join(format!("score.out"));
+
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(score)
+        .await?;
+
+    file.write_all(stats.score(&baseline_stats)?.to_string().as_bytes())
         .await?;
 
     Ok(())
@@ -244,5 +294,63 @@ fn parse_string(data: &str, re: Regex) -> anyhow::Result<String> {
         Ok(value.to_string())
     } else {
         bail!("Failed to parse {:?}", re)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    mod stats {
+        use crate::benchmarks::{AllStats, Stats};
+
+        #[test]
+        fn test_score_example() {
+            let mut stats = AllStats::default();
+
+            stats.insert("posts-title".to_owned(), Stats { rps: 100 });
+            stats.insert("posts-with-user".to_owned(), Stats { rps: 40 });
+            stats.insert("posts-nested".to_owned(), Stats { rps: 60 });
+
+            let mut baseline = AllStats::default();
+
+            baseline.insert("posts-title".to_owned(), Stats { rps: 50 });
+            baseline.insert("posts-with-user".to_owned(), Stats { rps: 50 });
+            baseline.insert("posts-nested".to_owned(), Stats { rps: 50 });
+
+            assert_eq!(stats.score(&baseline).unwrap(), 1333);
+        }
+
+        #[test]
+        fn test_score_equal() {
+            let mut stats = AllStats::default();
+
+            stats.insert("posts-title".to_owned(), Stats { rps: 100 });
+            stats.insert("posts-with-user".to_owned(), Stats { rps: 60 });
+            stats.insert("posts-nested".to_owned(), Stats { rps: 40 });
+
+            let mut baseline = AllStats::default();
+
+            baseline.insert("posts-title".to_owned(), Stats { rps: 100 });
+            baseline.insert("posts-with-user".to_owned(), Stats { rps: 60 });
+            baseline.insert("posts-nested".to_owned(), Stats { rps: 40 });
+
+            assert_eq!(stats.score(&baseline).unwrap(), 1000);
+        }
+
+        #[test]
+        fn test_score_less() {
+            let mut stats = AllStats::default();
+
+            stats.insert("posts-title".to_owned(), Stats { rps: 20 });
+            stats.insert("posts-with-user".to_owned(), Stats { rps: 10 });
+            stats.insert("posts-nested".to_owned(), Stats { rps: 5 });
+
+            let mut baseline = AllStats::default();
+
+            baseline.insert("posts-title".to_owned(), Stats { rps: 40 });
+            baseline.insert("posts-with-user".to_owned(), Stats { rps: 30 });
+            baseline.insert("posts-nested".to_owned(), Stats { rps: 20 });
+
+            assert_eq!(stats.score(&baseline).unwrap(), 361);
+        }
     }
 }
