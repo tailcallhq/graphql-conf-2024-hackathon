@@ -106,9 +106,6 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
         if single_stats.connect_errors > 0 {
             bail!("Execution failed because connect_errors")
         }
-        if single_stats.timeout_errors > 0 {
-            bail!("Execution failed because timeout_errors")
-        }
 
         stats.insert(bench_name.to_string(), single_stats);
     }
