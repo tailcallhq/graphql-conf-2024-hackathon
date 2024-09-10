@@ -114,7 +114,6 @@ impl Loader<i32> for PostLoader {
         let mut result = std::collections::HashMap::new();
         for &id in keys {
             let url = format!("{}/posts/{}", BASE_URL, id);
-            println!("[Finder]: url={}", url);
             let response = self.0.get(url).send().await?;
             if response.status().is_success() {
                 let post: Post = response.json().await?;
@@ -140,7 +139,6 @@ impl Loader<i32> for UserLoader {
             .collect::<Vec<_>>()
             .join("&");
         let url = format!("{}/users?{}", BASE_URL, qp);
-        println!("[Finder]: url={}", url);
         let response = self.0.get(url).send().await?;
         if response.status().is_success() {
             let users: Vec<User> = response.json().await?;
