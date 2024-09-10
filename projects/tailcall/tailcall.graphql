@@ -1,6 +1,6 @@
 schema
-  @server(port: 8000)
-  @upstream(baseURL: "http://localhost:3000") {
+  @server(port: 8000, dedupe: true)
+  @upstream(baseURL: "http://localhost:3000", batch: {delay: 1}) {
   query: Query
 }
 
@@ -16,7 +16,12 @@ type Post {
   userId: Int!
   title: String
   body: String
-  user: User @call(steps: [{query: "user", args: {id: "{{.value.userId}}"}}])
+  user: User
+    @http(
+      path: "/users"
+      query: [{key: "id", value: "{{.value.userId}}"}]
+      batchKey: ["id"]
+    )
 }
 
 type User {
