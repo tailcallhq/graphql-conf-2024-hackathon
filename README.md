@@ -63,9 +63,8 @@ type Geo {
 
 ## And Some More...
 
-- We might add new tests and modify the existing ones to ensure its there is no hardcoding and its a level playing field for all.
-- If you questions or doubts about the hackathon, connect with us on [Discord](
-https://discord.gg/GJHMeZup8m) or [X](https://x.com/tailcallhq) or the only two people in that bright yellow T-Shirt they'd be glad to say 👋.
+- We might add new tests and modify the existing ones to ensure there is no hardcoding and it's a level playing field for all.
+- If you have questions or doubts about the hackathon, connect with us on [Discord](https://discord.gg/GJHMeZup8m) or [X](https://x.com/tailcallhq) or the only two people in that bright yellow T-shirt they'd be glad to say 👋.
 
 Here's a clearer explanation of the scoring calculation for the hackathon:
 
@@ -112,7 +111,7 @@ Submit your solution as a pull request (PR) from your forked repo to the main re
 Your PR should only include file additions inside `/projects/${participant_name}`. Don’t change any other files or code belonging to other participants.
 
 **Can I use any language or tools?**  
-Yes, you can use any language, framework, or tools as long as they’re within the scope of the licenses. However, using the [tailcall](https://github.com/tailcallhq/tailcall/) tool is not allowed.
+Yes, you can use any language, framework, or tools as long as they’re within the scope of the licenses. However, the [tailcall](https://github.com/tailcallhq/tailcall/) tool is not allowed.
 
 **What should be included in the solution?**  
 Your solution should include all the source code and setup instructions necessary to understand how you achieved the solution and how to run it.
@@ -121,4 +120,4 @@ Your solution should include all the source code and setup instructions necessar
 Yes, you can collaborate, but only the person who submits the PR will be eligible to win the prize.
 
 **What if there are multiple solutions with identical code?**  
-Any kind of plagiarism will result in a ban, checkout our [guidelines](https://tailcall.run/docs/contributors/bounty/#identifying-plagiarism) on plagiarism for more.
+Any kind of plagiarism will result in a ban, Check our [guidelines](https://tailcall.run/docs/contributors/bounty/#identifying-plagiarism) on plagiarism for more.
