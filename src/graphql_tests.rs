@@ -5,7 +5,10 @@ use diff_logger::DiffLogger;
 use reqwest::Method;
 use tracing::{error, info};
 
-use crate::request::{MOCK_API_CLIENT, REFERENCE_GRAPHQL_CLIENT, TESTED_GRAPHQL_CLIENT};
+use crate::{
+    introspection::Schema,
+    request::{MOCK_API_CLIENT, REFERENCE_GRAPHQL_CLIENT, TESTED_GRAPHQL_CLIENT},
+};
 
 use super::ROOT_DIR;
 
@@ -59,6 +62,39 @@ pub async fn run_graphql_tests() -> Result<()> {
                 return Err(anyhow!("Actual response is not equal to expected"));
             }
         }
+    }
+
+    info!("Execution of graphql tests finished");
+
+    Ok(())
+}
+
+pub async fn run_introspection_query() -> Result<()> {
+    info!("Run graphql introspection tests");
+    let test = include_str!("./introspection_query.graphql");
+
+    let actual: Schema = serde_json::from_value(TESTED_GRAPHQL_CLIENT.request(&test).await?)?;
+    let expected: Schema = serde_json::from_value(REFERENCE_GRAPHQL_CLIENT.request(&test).await?)?;
+
+    println!("----------------------------------------------------");
+    println!("expected {:#?}", expected);
+    println!("actual {:#?}", actual);
+    println!("----------------------------------------------------");
+
+    let differ = DiffLogger::new();
+    let difference = differ.diff(
+        &serde_json::to_value(expected)?,
+        &serde_json::to_value(actual)?,
+    );
+
+    if !difference.is_empty() {
+        error!(
+            "Actual response is not equal to expected
+    Note: left is expected response -> right is actual response"
+        );
+        println!("{}", difference);
+
+        return Err(anyhow!("Actual response is not equal to expected"));
     }
 
     info!("Execution of graphql tests finished");
