@@ -36,7 +36,10 @@ struct Query;
 
 #[Object]
 impl Query {
-    async fn posts(&self, ctx: &Context<'_>) -> std::result::Result<Vec<Post>, async_graphql::Error> {
+    async fn posts(
+        &self,
+        ctx: &Context<'_>,
+    ) -> std::result::Result<Vec<Post>, async_graphql::Error> {
         let client = ctx.data_unchecked::<Arc<Client>>();
         let response = client.get(ALL_POSTS).send().await?;
         let posts: Vec<Post> = response.json().await?;
@@ -55,7 +58,8 @@ impl Query {
                 }
                 false
             } else {
-                let cached_posts: Vec<Post> = store.post.read().unwrap().values().cloned().collect();
+                let cached_posts: Vec<Post> =
+                    store.post.read().unwrap().values().cloned().collect();
                 let mut posts_writer = store.post.write().unwrap();
                 cached_posts.iter().all(|post| {
                     if let Some(new_post) = posts.iter().find(|p| p.id == post.id) {
@@ -72,26 +76,44 @@ impl Query {
             }
         };
 
+        if !are_posts_same {
+            // clean up the users.
+            store.users.write().unwrap().clear();
+        }
+
         *store.is_dirty.write().unwrap() = !are_posts_same;
         Ok(posts)
     }
 
-    async fn post(&self, ctx: &Context<'_>, id: i32) -> std::result::Result<Option<Post>, async_graphql::Error> {
+    async fn post(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+    ) -> std::result::Result<Option<Post>, async_graphql::Error> {
         let loader = ctx.data_unchecked::<DataLoader<PostLoader>>();
         let post = loader.load_one(id).await?;
         if let Some(actual_post) = post.as_ref() {
             let store = ctx.data_unchecked::<Arc<Store>>();
+            let mut are_posts_same = true;
             if let Some(cached_post) = store.post.read().unwrap().get(&id) {
                 if actual_post != cached_post {
                     *store.is_dirty.write().unwrap() = true;
+                    are_posts_same = false;
                 }
+            }
+            if !are_posts_same {
+                // clean up the users.
+                store.users.write().unwrap().clear();
             }
             store.post.write().unwrap().insert(id, actual_post.clone());
         }
         Ok(post)
     }
 
-    async fn users(&self, ctx: &Context<'_>) -> std::result::Result<Vec<User>, async_graphql::Error> {
+    async fn users(
+        &self,
+        ctx: &Context<'_>,
+    ) -> std::result::Result<Vec<User>, async_graphql::Error> {
         let client = ctx.data_unchecked::<Arc<Client>>();
         let response = client.get(ALL_USERS).send().await?;
         let users: Vec<User> = response.json().await?;
@@ -104,7 +126,9 @@ impl Query {
             let users_writer = store.users.read().unwrap();
             let are_users_same = selected_users.iter().all(|user| {
                 if let Some(id) = user.id {
-                    users_writer.get(&id).map_or(false, |cached_user| cached_user == *user)
+                    users_writer
+                        .get(&id)
+                        .map_or(false, |cached_user| cached_user == *user)
                 } else {
                     false
                 }
@@ -118,7 +142,11 @@ impl Query {
         Ok(users)
     }
 
-    async fn user(&self, ctx: &Context<'_>, id: i32) -> std::result::Result<Option<User>, async_graphql::Error> {
+    async fn user(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+    ) -> std::result::Result<Option<User>, async_graphql::Error> {
         let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
         let user = loader.load_one(id).await?;
         if let Some(actual_user) = &user {
@@ -160,7 +188,7 @@ impl Post {
         } else {
             let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
             let user = loader.load_one(self.user_id).await?;
-            
+
             if let Some(actual_user) = user.as_ref() {
                 if let Some(cached_user) = store.users.read().unwrap().get(&self.user_id) {
                     if cached_user != actual_user {
