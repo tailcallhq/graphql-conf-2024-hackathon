@@ -43,7 +43,7 @@ const resolvers = {
         }
     },
     Post: {
-        user: async (post: { userId: number }, args: any, { cache, userDataLoader }: IContext) => {
+        user: async (post: { userId: number }, _: any, { cache, userDataLoader }: IContext) => {
             if (cache.userMap[post.userId]) {
                 return cache.userMap[post.userId]
             }
@@ -51,14 +51,6 @@ const resolvers = {
             return res;
         }
     },
-    User: {
-        posts: async (user: { id: number }) => {
-            const response = await axiosInstance.get('/posts', {
-                params: { userId: user.id },
-            });
-            return response.data;
-        }
-    }
 };
 
 export default resolvers;
