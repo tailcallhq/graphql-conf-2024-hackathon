@@ -74,7 +74,7 @@ impl Query {
                 true
             } else {
                 store.reset();
-                let store_post_writer = store.post.writer().unwrap();
+                let mut store_post_writer = store.post.write().unwrap();
                 store_post_writer.insert(posts[1].id.unwrap(), posts[1].clone());
                 store_post_writer.insert(posts[2].id.unwrap(), posts[2].clone());
                 false
