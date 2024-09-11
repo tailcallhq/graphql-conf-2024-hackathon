@@ -13,8 +13,12 @@ server.register(mercurius, {
     schema,
     resolvers,
     context: () => {
-        let cache = {};
-        let postsCache = {};
+        let cache = {
+            usersList: null,
+            postsList: null,
+            postMap: {},
+            userMap: {}
+        };
 
         const userDataLoader = new DataLoader(async function (ids: any) {
             const response = await axiosInstance.get('/users', {
@@ -49,11 +53,10 @@ server.register(mercurius, {
             userDataLoader,
             postDataLoader,
             cache,
-            postsCache
         }
     },
     graphiql: true
-})
+} as any)
 
 server.get('/ping', async (request, reply) => {
     return 'pong\n'

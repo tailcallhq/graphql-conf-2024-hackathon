@@ -1,41 +1,53 @@
 import axiosInstance from './axios';
+import { IContext } from './types';
 
 const resolvers = {
     Query: {
-        posts: async (_: any, __: any, { cache, postsCache }: any) => {
-            if (cache['posts']) {
-                return cache['posts'];
+        posts: async (_: any, __: any, { cache }: IContext) => {
+            if (cache.postsList) {
+                return cache.postsList;
             }
             const response = await axiosInstance.get('/posts');
-            cache['posts'] = response.data;
+            cache.postsList = response.data;
 
             response.data.map((currPost: any) => {
-                postsCache[currPost.id] = currPost;
+                cache.postMap[currPost.id] = currPost;
             })
 
             return response.data;
         },
-        post: async (_: any, { id }: { id: number }, { postsCache, postDataLoader }: any) => {
-            if (postsCache[id]) {
-                return postsCache[id];
+        post: async (_: any, { id }: { id: number }, { cache, postDataLoader }: IContext) => {
+            if (cache.postMap[id]) {
+                return cache.postMap[id];
             }
             return postDataLoader.load(id);
         },
-        users: async (_: any, __: any, { cache }: any) => {
-            if (cache['users']) {
-                return cache['users'];
+        users: async (_: any, __: any, { cache }: IContext) => {
+            if (cache.usersList) {
+                return cache.usersList;
             }
             const response = await axiosInstance.get('/users');
-            cache['users'] = response.data;
+            cache.usersList = response.data;
+
+            response.data.map((currUser: any) => {
+                cache.userMap[currUser.id] = currUser;
+            })
+
             return response.data;
         },
-        user: async (_: any, { id }: { id: number }, context: any) => {
-            return context?.userDataLoader.load(id);
+        user: async (_: any, { id }: { id: number }, { cache, userDataLoader }: IContext) => {
+            if (cache.userMap[id]) {
+                return cache.userMap[id];
+            }
+            return userDataLoader.load(id);
         }
     },
     Post: {
-        user: async (post: { userId: number }, args: any, context: any) => {
-            const res = context?.userDataLoader.load(post.userId)
+        user: async (post: { userId: number }, args: any, { cache, userDataLoader }: IContext) => {
+            if (cache.userMap[post.userId]) {
+                return cache.userMap[post.userId]
+            }
+            const res = userDataLoader.load(post.userId)
             return res;
         }
     },
