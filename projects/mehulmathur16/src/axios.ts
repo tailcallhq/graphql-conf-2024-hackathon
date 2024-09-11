@@ -1,5 +1,8 @@
 import axios from 'axios';
+import http from 'http'
 const qs = require('qs');
+
+const httpAgent = new http.Agent({ keepAlive: true });
 
 const axiosInstance = axios.create({
     baseURL: 'http://localhost:3000',
@@ -7,6 +10,7 @@ const axiosInstance = axios.create({
     paramsSerializer: params => {
         return qs.stringify(params, { arrayFormat: 'repeat' });
     },
+    httpAgent,
 });
 
 export default axiosInstance;

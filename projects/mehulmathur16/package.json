@@ -16,6 +16,7 @@
     "dataloader": "^2.2.2",
     "fastify": "^4.28.1",
     "graphql": "^16.9.0",
+    "http": "^0.0.1-security",
     "mercurius": "^14.1.0",
     "mercurius-cache": "^6.0.1",
     "qs": "^6.13.0"
