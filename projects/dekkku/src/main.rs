@@ -31,14 +31,6 @@ impl Default for Store {
     }
 }
 
-impl Store {
-    pub fn reset(&self) {
-        self.users.write().unwrap().clear();
-        self.post.write().unwrap().clear();
-        *self.is_post_same.write().unwrap() = false;
-    }
-}
-
 struct Query;
 
 #[Object]
