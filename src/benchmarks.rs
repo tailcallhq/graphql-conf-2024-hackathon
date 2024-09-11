@@ -15,22 +15,11 @@ use crate::{command::Command, ROOT_DIR};
 
 #[derive(Serialize, Deserialize, Default)]
 struct Stats {
-    latency_avg: String,
-    latency_stdev: String,
-    latency_max: String,
-    latency_stdev_percent: u64,
-    rps_avg: u64,
-    rps_stdev: u64,
-    rps_max: u64,
-    rps_stdev_percent: u64,
-    total_requests: u64,
-    memory: u64,
     connect_errors: u64,
     read_errors: u64,
     write_errors: u64,
     timeout_errors: u64,
     rps: u64,
-    tps: u64,
 }
 
 static BENCHES: LazyLock<Result<Vec<String>>> = LazyLock::new(|| {
@@ -168,39 +157,17 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
 fn parse_wrk(output: &Vec<u8>) -> Result<Stats> {
     let output_str = String::from_utf8_lossy(output);
 
-    let (latency_avg, latency_stdev, latency_max, latency_stdev_percent) =
-        extract_latency_variables(&output_str).context("Failed to parse latency variables")?;
-
-    let (rps_avg, rps_stdev, rps_max, rps_stdev_percent) =
-        extract_rps_variables(&output_str).context("Failed to parse rps variables")?;
-
-    let (total_requests, memory) =
-        extract_totals(&output_str).context("Failed to parse global total variables")?;
-
     let (connect_errors, read_errors, write_errors, timeout_errors) = extract_errors(&output_str);
 
     let rps = parse_u64(&output_str, Regex::new(r"Requests\/sec:\s+(\d+).?\d+")?)
         .context("Failed to parse rps")?;
-    let tps = parse_u64(&output_str, Regex::new(r"Transfer\/sec:\s+(\d+).?\d+")?)
-        .context("Failed to parse tps")?;
 
     Ok(Stats {
-        latency_avg,
-        latency_stdev,
-        latency_max,
-        latency_stdev_percent,
-        rps_avg,
-        rps_stdev,
-        rps_max,
-        rps_stdev_percent,
-        total_requests,
-        memory,
         connect_errors,
         read_errors,
         write_errors,
         timeout_errors,
         rps,
-        tps,
     })
 }
 
@@ -376,50 +343,6 @@ mod tests {
 
             assert_eq!(stats.score(&baseline).unwrap(), 361);
         }
-    }
-}
-
-fn extract_latency_variables(data: &str) -> anyhow::Result<(String, String, String, u64)> {
-    let re = Regex::new(
-        r"Latency\s+(\d+.?\d+[a-z]+)\s+(\d+.?\d+[a-z]+)\s+(\d+.?\d+[a-z]+)\s+(\d+).?\d+%",
-    )?;
-    if let Some(caps) = re.captures(data) {
-        Ok((
-            caps[1].to_string(),
-            caps[2].to_string(),
-            caps[3].to_string(),
-            caps[4]
-                .parse()
-                .context("Failed to parse latency +/- stdev")?,
-        ))
-    } else {
-        bail!("Failed to extract `extract_latency_variables`")
-    }
-}
-
-fn extract_rps_variables(data: &str) -> anyhow::Result<(u64, u64, u64, u64)> {
-    let re = Regex::new(r"Req\/Sec\s+(\d+).?\d+\s+(\d+).?\d+\s+(\d+).?\d+\s+(\d+).?\d+%")?;
-    if let Some(caps) = re.captures(data) {
-        Ok((
-            caps[1].parse().context("Failed to parse rps avg")?,
-            caps[2].parse().context("Failed to parse rps stdev")?,
-            caps[3].parse().context("Failed to parse rps max")?,
-            caps[4].parse().context("Failed to parse rps +/- stdev")?,
-        ))
-    } else {
-        bail!("Failed to extract `extract_rps_variables`")
-    }
-}
-
-fn extract_totals(data: &str) -> anyhow::Result<(u64, u64)> {
-    let re = Regex::new(r"(\d+)\s+requests\s+in\s+\d+.?\d+s,\s+(\d+).?\d+")?;
-    if let Some(caps) = re.captures(data) {
-        Ok((
-            caps[1].parse().context("Failed to parse total requests")?,
-            caps[2].parse().context("Failed to parse memory usage")?,
-        ))
-    } else {
-        bail!("Failed to extract `extract_totals`")
     }
 }
 
