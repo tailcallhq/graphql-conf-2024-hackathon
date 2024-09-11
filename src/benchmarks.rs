@@ -130,7 +130,7 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
 
         file.write_all(stdout).await?;
 
-        let single_stats = parse_wrk(stdout)?;
+        let single_stats = parse_wrk(stdout).context("Failed to parse wrk output")?;
 
         if single_stats.read_errors > 0 {
             bail!("Execution failed because read_errors")
