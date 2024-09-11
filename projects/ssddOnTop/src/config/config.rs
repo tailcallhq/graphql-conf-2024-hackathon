@@ -39,6 +39,8 @@ impl Default for Server {
 pub struct Upstream {
     #[serde(rename = "baseURL", default, skip_serializing_if = "is_default")]
     pub base_url: Option<String>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub http_cache: Option<u64>,
 }
 
 // TODO: rename

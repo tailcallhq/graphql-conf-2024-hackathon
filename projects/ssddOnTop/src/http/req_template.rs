@@ -1,12 +1,13 @@
 use crate::endpoint::Endpoint;
 use crate::mustache::model::Mustache;
 use std::hash::Hash;
+use hyper::Method;
 
 #[derive(Debug, Clone)]
 pub struct RequestTemplate {
     pub root_url: Mustache,
     pub query: Vec<Query>,
-    pub method: reqwest::Method,
+    pub method: Method,
     // pub headers: MustacheHeaders,
 }
 

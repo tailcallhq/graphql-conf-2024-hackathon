@@ -22,7 +22,7 @@ mod tests {
     use crate::config::KeyValue;
     use crate::mustache::model::Mustache;
     use anyhow::Result;
-    use hyper::header::HeaderName;
+    use reqwest::header::HeaderName;
 
     #[test]
     fn valid_headers() -> Result<()> {

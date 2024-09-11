@@ -1,8 +1,9 @@
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
+use crate::http::method::Method;
 
 pub struct Request {
-    pub method: hyper::Method,
+    pub method: Method,
     pub url: hyper::Uri,
     pub headers: hyper::HeaderMap,
     pub body: bytes::Bytes,
@@ -14,7 +15,7 @@ impl Request {
         let body = body.collect().await?.to_bytes();
 
         Ok(Self {
-            method: part.method,
+            method: Method::from(part.method),
             url: part.uri,
             headers: part.headers,
             body,

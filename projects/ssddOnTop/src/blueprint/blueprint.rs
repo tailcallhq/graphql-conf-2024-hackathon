@@ -68,7 +68,7 @@ pub struct InputFieldDefinition {
     pub of_type: Type,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Server {
     pub host: IpAddr,
     pub port: u16,
@@ -79,9 +79,10 @@ impl Server {
         SocketAddr::new(self.host, self.port)
     }
 }
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Upstream {
     pub base_url: Option<String>,
+    pub http_cache: u64,
 }
 
 impl TryFrom<&Config> for Blueprint {
@@ -103,6 +104,7 @@ impl TryFrom<&Config> for Blueprint {
         };
         let upstream = Upstream {
             base_url: config.upstream.base_url.clone(),
+            http_cache: config.upstream.http_cache.unwrap_or(10000),
         };
         Ok(Blueprint {
             fields,

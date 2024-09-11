@@ -15,6 +15,23 @@ pub enum Method {
     TRACE,
 }
 
+impl From<hyper::Method> for Method {
+    fn from(value: hyper::Method) -> Self {
+        match value {
+            hyper::Method::GET => Method::GET,
+            hyper::Method::POST => Method::POST,
+            hyper::Method::PUT => Method::PUT,
+            hyper::Method::PATCH => Method::PATCH,
+            hyper::Method::DELETE => Method::DELETE,
+            hyper::Method::HEAD => Method::HEAD,
+            hyper::Method::OPTIONS => Method::OPTIONS,
+            hyper::Method::CONNECT => Method::CONNECT,
+            hyper::Method::TRACE => Method::TRACE,
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl Method {
     pub fn to_hyper(self) -> hyper::Method {
         match self {
