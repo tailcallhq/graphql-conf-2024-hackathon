@@ -6,9 +6,8 @@ const resolvers = {
             const response = await axiosInstance.get('/posts');
             return response.data;
         },
-        post: async (_: any, { id }: { id: number }) => {
-            const response = await axiosInstance.get(`/posts/${id}`);
-            return response.data;
+        post: async (_: any, { id }: { id: number }, context: any) => {
+            return context?.postDataLoader.load(id);
         },
         users: async () => {
             const response = await axiosInstance.get('/users');

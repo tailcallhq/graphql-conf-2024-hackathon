@@ -26,8 +26,20 @@ server.register(mercurius, {
             return ids.map((id: any) => obj[id]);
         })
 
+        const postDataLoader = new DataLoader(async function (ids: any) {
+            const response = await axiosInstance.get('/posts');
+            const posts = response.data;
+            let obj = {} as any
+
+            posts.map((post: any) => {
+                obj[post.id] = post;
+            })
+            return ids.map((id: any) => obj[id]);
+        })
+
         return {
             userDataLoader,
+            postDataLoader,
         }
     },
     graphiql: true
