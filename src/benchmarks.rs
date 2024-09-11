@@ -13,6 +13,15 @@ use tracing::{info, instrument};
 
 use crate::{command::Command, ROOT_DIR};
 
+#[derive(Serialize, Deserialize, Default)]
+struct Stats {
+    connect_errors: u64,
+    read_errors: u64,
+    write_errors: u64,
+    timeout_errors: u64,
+    rps: u64,
+}
+
 static BENCHES: LazyLock<Result<Vec<String>>> = LazyLock::new(|| {
     let tests_path = format!("{ROOT_DIR}/benches");
     let mut tests = Vec::new();
@@ -34,13 +43,7 @@ static BENCHES: LazyLock<Result<Vec<String>>> = LazyLock::new(|| {
     Ok(tests)
 });
 
-#[derive(Serialize, Deserialize)]
-struct Stats {
-    rps: u64,
-}
-
 #[derive(Serialize, Deserialize, Default)]
-
 struct AllStats(BTreeMap<String, Stats>);
 
 impl Deref for AllStats {
@@ -65,7 +68,6 @@ impl AllStats {
             let baseline_stats = baseline
                 .get(key)
                 .context("Cannot find specific key in baseline stats")?;
-
             sum += 1000 * stats.rps / baseline_stats.rps;
         }
 
@@ -117,7 +119,10 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
 
         file.write_all(stdout).await?;
 
-        let single_stats = parse_wrk(stdout)?;
+        let single_stats = parse_wrk(stdout).context("Failed to parse wrk output")?;
+
+        check_errors(&single_stats)
+            .context("Connection errors found during execution, check benchmark output")?;
 
         stats.insert(bench_name.to_string(), single_stats);
     }
@@ -152,18 +157,27 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
 fn parse_wrk(output: &Vec<u8>) -> Result<Stats> {
     let output_str = String::from_utf8_lossy(output);
 
-    // only the integer part of rps
-    let re = Regex::new(r"Requests/sec:\s+(\d+)")?;
+    let (connect_errors, read_errors, write_errors, timeout_errors) = extract_errors(&output_str);
 
-    let rps = if let Some(caps) = re.captures(&output_str) {
-        let rps = &caps[1];
+    let rps = parse_u64(&output_str, Regex::new(r"Requests\/sec:\s+(\d+).?\d+")?)
+        .context("Failed to parse rps")?;
 
-        rps.parse()?
+    Ok(Stats {
+        connect_errors,
+        read_errors,
+        write_errors,
+        timeout_errors,
+        rps,
+    })
+}
+
+fn parse_u64(data: &str, re: Regex) -> anyhow::Result<u64> {
+    if let Some(caps) = re.captures(data) {
+        let value = &caps[1];
+        Ok(value.parse().context("Failed to parse u64")?)
     } else {
-        bail!("Failed to parse wrk output");
-    };
-
-    Ok(Stats { rps })
+        bail!("Failed to parse {:?}", re)
+    }
 }
 
 #[cfg(test)]
@@ -175,15 +189,51 @@ mod tests {
         fn test_score_example() {
             let mut stats = AllStats::default();
 
-            stats.insert("posts-title".to_owned(), Stats { rps: 100 });
-            stats.insert("posts-with-user".to_owned(), Stats { rps: 40 });
-            stats.insert("posts-nested".to_owned(), Stats { rps: 60 });
+            stats.insert(
+                "posts-title".to_owned(),
+                Stats {
+                    rps: 100,
+                    ..Default::default()
+                },
+            );
+            stats.insert(
+                "posts-with-user".to_owned(),
+                Stats {
+                    rps: 40,
+                    ..Default::default()
+                },
+            );
+            stats.insert(
+                "posts-nested".to_owned(),
+                Stats {
+                    rps: 60,
+                    ..Default::default()
+                },
+            );
 
             let mut baseline = AllStats::default();
 
-            baseline.insert("posts-title".to_owned(), Stats { rps: 50 });
-            baseline.insert("posts-with-user".to_owned(), Stats { rps: 50 });
-            baseline.insert("posts-nested".to_owned(), Stats { rps: 50 });
+            baseline.insert(
+                "posts-title".to_owned(),
+                Stats {
+                    rps: 50,
+                    ..Default::default()
+                },
+            );
+            baseline.insert(
+                "posts-with-user".to_owned(),
+                Stats {
+                    rps: 50,
+                    ..Default::default()
+                },
+            );
+            baseline.insert(
+                "posts-nested".to_owned(),
+                Stats {
+                    rps: 50,
+                    ..Default::default()
+                },
+            );
 
             assert_eq!(stats.score(&baseline).unwrap(), 1333);
         }
@@ -192,15 +242,51 @@ mod tests {
         fn test_score_equal() {
             let mut stats = AllStats::default();
 
-            stats.insert("posts-title".to_owned(), Stats { rps: 100 });
-            stats.insert("posts-with-user".to_owned(), Stats { rps: 60 });
-            stats.insert("posts-nested".to_owned(), Stats { rps: 40 });
+            stats.insert(
+                "posts-title".to_owned(),
+                Stats {
+                    rps: 100,
+                    ..Default::default()
+                },
+            );
+            stats.insert(
+                "posts-with-user".to_owned(),
+                Stats {
+                    rps: 60,
+                    ..Default::default()
+                },
+            );
+            stats.insert(
+                "posts-nested".to_owned(),
+                Stats {
+                    rps: 40,
+                    ..Default::default()
+                },
+            );
 
             let mut baseline = AllStats::default();
 
-            baseline.insert("posts-title".to_owned(), Stats { rps: 100 });
-            baseline.insert("posts-with-user".to_owned(), Stats { rps: 60 });
-            baseline.insert("posts-nested".to_owned(), Stats { rps: 40 });
+            baseline.insert(
+                "posts-title".to_owned(),
+                Stats {
+                    rps: 100,
+                    ..Default::default()
+                },
+            );
+            baseline.insert(
+                "posts-with-user".to_owned(),
+                Stats {
+                    rps: 60,
+                    ..Default::default()
+                },
+            );
+            baseline.insert(
+                "posts-nested".to_owned(),
+                Stats {
+                    rps: 40,
+                    ..Default::default()
+                },
+            );
 
             assert_eq!(stats.score(&baseline).unwrap(), 1000);
         }
@@ -209,17 +295,86 @@ mod tests {
         fn test_score_less() {
             let mut stats = AllStats::default();
 
-            stats.insert("posts-title".to_owned(), Stats { rps: 20 });
-            stats.insert("posts-with-user".to_owned(), Stats { rps: 10 });
-            stats.insert("posts-nested".to_owned(), Stats { rps: 5 });
+            stats.insert(
+                "posts-title".to_owned(),
+                Stats {
+                    rps: 20,
+                    ..Default::default()
+                },
+            );
+            stats.insert(
+                "posts-with-user".to_owned(),
+                Stats {
+                    rps: 10,
+                    ..Default::default()
+                },
+            );
+            stats.insert(
+                "posts-nested".to_owned(),
+                Stats {
+                    rps: 5,
+                    ..Default::default()
+                },
+            );
 
             let mut baseline = AllStats::default();
 
-            baseline.insert("posts-title".to_owned(), Stats { rps: 40 });
-            baseline.insert("posts-with-user".to_owned(), Stats { rps: 30 });
-            baseline.insert("posts-nested".to_owned(), Stats { rps: 20 });
+            baseline.insert(
+                "posts-title".to_owned(),
+                Stats {
+                    rps: 40,
+                    ..Default::default()
+                },
+            );
+            baseline.insert(
+                "posts-with-user".to_owned(),
+                Stats {
+                    rps: 30,
+                    ..Default::default()
+                },
+            );
+            baseline.insert(
+                "posts-nested".to_owned(),
+                Stats {
+                    rps: 20,
+                    ..Default::default()
+                },
+            );
 
             assert_eq!(stats.score(&baseline).unwrap(), 361);
         }
     }
+}
+
+fn extract_errors(data: &str) -> (u64, u64, u64, u64) {
+    let re = Regex::new(
+        r"Socket\s+errors:\s+connect\s+(\d+),\s+read\s+(\d+).\s+write\s+(\d+).\s+timeout\s+(\d+)",
+    )
+    .unwrap();
+    if let Some(caps) = re.captures(data) {
+        (
+            caps[1].parse().unwrap_or(0),
+            caps[2].parse().unwrap_or(0),
+            caps[3].parse().unwrap_or(0),
+            caps[4].parse().unwrap_or(0),
+        )
+    } else {
+        (0, 0, 0, 0)
+    }
+}
+
+fn check_errors(single_stats: &Stats) -> anyhow::Result<()> {
+    if single_stats.read_errors > 0 {
+        bail!("Execution failed because read_errors exist")
+    }
+
+    if single_stats.write_errors > 0 {
+        bail!("Execution failed because write_errors exist")
+    }
+
+    if single_stats.connect_errors > 0 {
+        bail!("Execution failed because connect_errors exist")
+    }
+
+    Ok(())
 }

@@ -17,7 +17,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     if let Err(error) = run().await {
-        error!("Critical error: {}", error);
+        error!("Critical error: {:#}", error);
         panic!("Critical error");
     }
 }

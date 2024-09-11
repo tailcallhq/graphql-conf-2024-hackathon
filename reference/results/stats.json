@@ -1,11 +1,23 @@
 {
   "posts-nested": {
+    "connect_errors": 0,
+    "read_errors": 0,
+    "write_errors": 0,
+    "timeout_errors": 0,
     "rps": 6002
   },
   "posts-title": {
+    "connect_errors": 0,
+    "read_errors": 0,
+    "write_errors": 0,
+    "timeout_errors": 0,
     "rps": 11864
   },
   "posts-with-user": {
+    "connect_errors": 0,
+    "read_errors": 0,
+    "write_errors": 0,
+    "timeout_errors": 0,
     "rps": 6011
   }
 }
