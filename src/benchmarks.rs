@@ -132,15 +132,8 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
 
         let single_stats = parse_wrk(stdout).context("Failed to parse wrk output")?;
 
-        if single_stats.read_errors > 0 {
-            bail!("Execution failed because read_errors")
-        }
-        if single_stats.write_errors > 0 {
-            bail!("Execution failed because write_errors")
-        }
-        if single_stats.connect_errors > 0 {
-            bail!("Execution failed because connect_errors")
-        }
+        check_errors(&single_stats)
+            .context("Connection errors found during execution, check benchmark output")?;
 
         stats.insert(bench_name.to_string(), single_stats);
     }
@@ -176,16 +169,20 @@ fn parse_wrk(output: &Vec<u8>) -> Result<Stats> {
     let output_str = String::from_utf8_lossy(output);
 
     let (latency_avg, latency_stdev, latency_max, latency_stdev_percent) =
-        extract_latency_variables(&output_str)?;
+        extract_latency_variables(&output_str).context("Failed to parse latency variables")?;
 
-    let (rps_avg, rps_stdev, rps_max, rps_stdev_percent) = extract_rps_variables(&output_str)?;
+    let (rps_avg, rps_stdev, rps_max, rps_stdev_percent) =
+        extract_rps_variables(&output_str).context("Failed to parse rps variables")?;
 
-    let (total_requests, memory) = extract_totals(&output_str)?;
+    let (total_requests, memory) =
+        extract_totals(&output_str).context("Failed to parse global total variables")?;
 
     let (connect_errors, read_errors, write_errors, timeout_errors) = extract_errors(&output_str);
 
-    let rps = parse_u64(&output_str, Regex::new(r"Requests\/sec:\s+(\d+).?\d+")?)?;
-    let tps = parse_u64(&output_str, Regex::new(r"Transfer\/sec:\s+(\d+).?\d+")?)?;
+    let rps = parse_u64(&output_str, Regex::new(r"Requests\/sec:\s+(\d+).?\d+")?)
+        .context("Failed to parse rps")?;
+    let tps = parse_u64(&output_str, Regex::new(r"Transfer\/sec:\s+(\d+).?\d+")?)
+        .context("Failed to parse tps")?;
 
     Ok(Stats {
         latency_avg,
@@ -210,7 +207,7 @@ fn parse_wrk(output: &Vec<u8>) -> Result<Stats> {
 fn parse_u64(data: &str, re: Regex) -> anyhow::Result<u64> {
     if let Some(caps) = re.captures(data) {
         let value = &caps[1];
-        Ok(value.parse()?)
+        Ok(value.parse().context("Failed to parse u64")?)
     } else {
         bail!("Failed to parse {:?}", re)
     }
@@ -391,7 +388,9 @@ fn extract_latency_variables(data: &str) -> anyhow::Result<(String, String, Stri
             caps[1].to_string(),
             caps[2].to_string(),
             caps[3].to_string(),
-            caps[4].parse()?,
+            caps[4]
+                .parse()
+                .context("Failed to parse latency +/- stdev")?,
         ))
     } else {
         bail!("Failed to extract `extract_latency_variables`")
@@ -402,10 +401,10 @@ fn extract_rps_variables(data: &str) -> anyhow::Result<(u64, u64, u64, u64)> {
     let re = Regex::new(r"Req\/Sec\s+(\d+).?\d+\s+(\d+).?\d+\s+(\d+).?\d+\s+(\d+).?\d+%")?;
     if let Some(caps) = re.captures(data) {
         Ok((
-            caps[1].parse()?,
-            caps[2].parse()?,
-            caps[3].parse()?,
-            caps[4].parse()?,
+            caps[1].parse().context("Failed to parse rps avg")?,
+            caps[2].parse().context("Failed to parse rps stdev")?,
+            caps[3].parse().context("Failed to parse rps max")?,
+            caps[4].parse().context("Failed to parse rps +/- stdev")?,
         ))
     } else {
         bail!("Failed to extract `extract_rps_variables`")
@@ -415,7 +414,10 @@ fn extract_rps_variables(data: &str) -> anyhow::Result<(u64, u64, u64, u64)> {
 fn extract_totals(data: &str) -> anyhow::Result<(u64, u64)> {
     let re = Regex::new(r"(\d+)\s+requests\s+in\s+\d+.?\d+s,\s+(\d+).?\d+")?;
     if let Some(caps) = re.captures(data) {
-        Ok((caps[1].parse()?, caps[2].parse()?))
+        Ok((
+            caps[1].parse().context("Failed to parse total requests")?,
+            caps[2].parse().context("Failed to parse memory usage")?,
+        ))
     } else {
         bail!("Failed to extract `extract_totals`")
     }
@@ -436,4 +438,20 @@ fn extract_errors(data: &str) -> (u64, u64, u64, u64) {
     } else {
         (0, 0, 0, 0)
     }
+}
+
+fn check_errors(single_stats: &Stats) -> anyhow::Result<()> {
+    if single_stats.read_errors > 0 {
+        bail!("Execution failed because read_errors exist")
+    }
+
+    if single_stats.write_errors > 0 {
+        bail!("Execution failed because write_errors exist")
+    }
+
+    if single_stats.connect_errors > 0 {
+        bail!("Execution failed because connect_errors exist")
+    }
+
+    Ok(())
 }
