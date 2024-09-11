@@ -10,6 +10,7 @@ mod json;
 mod path;
 mod hasher;
 mod value;
+mod endpoint;
 
 pub fn is_default<T: Default + Eq>(val: &T) -> bool {
     *val == T::default()

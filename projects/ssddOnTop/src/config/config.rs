@@ -1,9 +1,10 @@
 use crate::blueprint::wrapping_type;
+use crate::config::url_query::URLQuery;
 use crate::is_default;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::num::NonZeroU64;
-use derive_setters::Setters;
+use crate::http::method::Method;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
@@ -86,10 +87,24 @@ pub struct Arg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Http {
     pub path: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub method: Method,
+    #[serde(rename = "baseURL", default, skip_serializing_if = "is_default")]
+    pub base_url: Option<String>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub query: Vec<URLQuery>,
 }
 
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Resolver {
     Http(Http),
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum GraphQLOperationType {
+    #[default]
+    Query,
+    Mutation,
 }

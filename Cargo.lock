@@ -2101,6 +2101,7 @@ dependencies = [
  "serde_json",
  "serde_json_borrow",
  "serde_path_to_error",
+ "strum_macros",
  "test-log",
  "tokio",
  "tracing",

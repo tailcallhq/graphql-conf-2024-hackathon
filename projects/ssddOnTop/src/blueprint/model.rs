@@ -1,4 +1,5 @@
 use std::fmt::{Debug, Formatter};
+use crate::ir::IR;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FieldName(pub String);
@@ -56,6 +57,6 @@ pub struct Field {
     pub id: FieldId,
     pub name: FieldName,
     pub type_of: crate::blueprint::wrapping_type::Type,
-    // pub ir: Option<IR>,
+    pub ir: Option<IR>,
     pub args: Vec<Arg>,
 }

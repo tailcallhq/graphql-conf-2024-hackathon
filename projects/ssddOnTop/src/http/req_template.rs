@@ -1,15 +1,13 @@
-use std::hash::{Hash, Hasher};
-use crate::hasher::MyHasher;
-use crate::helpers::headers::MustacheHeaders;
-use crate::ir::IoId;
+use crate::endpoint::Endpoint;
 use crate::mustache::model::Mustache;
+use std::hash::Hash;
 
 #[derive(Debug, Clone)]
 pub struct RequestTemplate {
     pub root_url: Mustache,
     pub query: Vec<Query>,
     pub method: reqwest::Method,
-    pub headers: MustacheHeaders,
+    // pub headers: MustacheHeaders,
 }
 
 #[derive(Debug, Clone)]
@@ -17,6 +15,38 @@ pub struct Query {
     pub key: String,
     pub value: Mustache,
     pub skip_empty: bool,
+}
+
+impl TryFrom<Endpoint> for RequestTemplate {
+    type Error = anyhow::Error;
+    fn try_from(endpoint: Endpoint) -> anyhow::Result<Self> {
+        let path = Mustache::parse(endpoint.path.as_str());
+        let query = endpoint
+            .query
+            .iter()
+            .map(|(k, v, skip)| {
+                Ok(Query {
+                    key: k.as_str().to_string(),
+                    value: Mustache::parse(v.as_str()),
+                    skip_empty: *skip,
+                })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let method = endpoint.method.clone().to_hyper();
+/*        let headers = endpoint
+            .headers
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), Mustache::parse(v.to_str()?))))
+            .collect::<anyhow::Result<Vec<_>>>()?;*/
+
+
+        Ok(Self {
+            root_url: path,
+            query,
+            method,
+            // headers,
+        })
+    }
 }
 
 /*impl RequestTemplate {
