@@ -2,15 +2,23 @@ import axiosInstance from './axios';
 
 const resolvers = {
     Query: {
-        posts: async () => {
+        posts: async (_: any, __: any, { cache }: any) => {
+            if (cache['posts']) {
+                return cache['posts'];
+            }
             const response = await axiosInstance.get('/posts');
+            cache['posts'] = response.data;
             return response.data;
         },
         post: async (_: any, { id }: { id: number }, context: any) => {
             return context?.postDataLoader.load(id);
         },
-        users: async () => {
+        users: async (_: any, __: any, { cache }: any) => {
+            if (cache['users']) {
+                return cache['users'];
+            }
             const response = await axiosInstance.get('/users');
+            cache['users'] = response.data;
             return response.data;
         },
         user: async (_: any, { id }: { id: number }, context: any) => {

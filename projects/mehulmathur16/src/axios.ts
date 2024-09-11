@@ -6,7 +6,7 @@ const axiosInstance = axios.create({
     timeout: 1000,
     paramsSerializer: params => {
         return qs.stringify(params, { arrayFormat: 'repeat' });
-    }
+    },
 });
 
 export default axiosInstance;

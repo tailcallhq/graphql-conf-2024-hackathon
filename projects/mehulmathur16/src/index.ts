@@ -13,6 +13,8 @@ server.register(mercurius, {
     schema,
     resolvers,
     context: () => {
+        let cache = {};
+
         const userDataLoader = new DataLoader(async function (ids: any) {
             const response = await axiosInstance.get('/users', {
                 params: { id: ids }
@@ -24,7 +26,7 @@ server.register(mercurius, {
                 obj[user.id] = user;
             })
             return ids.map((id: any) => obj[id]);
-        })
+        }, { cache: true })
 
         const postDataLoader = new DataLoader(async function (ids: any) {
             const posts = await Promise.all(
@@ -39,11 +41,12 @@ server.register(mercurius, {
             );
 
             return posts;
-        })
+        }, { cache: true })
 
         return {
             userDataLoader,
             postDataLoader,
+            cache
         }
     },
     graphiql: true
