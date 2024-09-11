@@ -4,9 +4,6 @@ import schema from './schema'
 import resolvers from './resolvers'
 import axiosInstance from './axios'
 import DataLoader from 'dataloader'
-import http from 'http';
-
-const httpAgent = new http.Agent({ keepAlive: true });
 
 const server = fastify({
     logger: true
@@ -21,7 +18,7 @@ server.register(mercurius, {
         const userDataLoader = new DataLoader(async function (ids: any) {
             const response = await axiosInstance.get('/users', {
                 params: { id: ids },
-                httpAgent
+
             });
             const users = response.data;
             let obj = {} as any
@@ -36,7 +33,7 @@ server.register(mercurius, {
             const posts = await Promise.all(
                 ids.map(async (id: any) => {
                     try {
-                        const response = await axiosInstance.get(`/posts/${id}`, { httpAgent });
+                        const response = await axiosInstance.get(`/posts/${id}`,);
                         return response.data;
                     } catch (error: any) {
                         return new Error(`Failed to fetch post with id ${id}: ${error.message}`);

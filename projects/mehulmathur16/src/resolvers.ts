@@ -1,15 +1,13 @@
 import axiosInstance from './axios';
 import http from 'http';
 
-const httpAgent = new http.Agent({ keepAlive: true });
-
 const resolvers = {
     Query: {
         posts: async (_: any, __: any, { cache }: any) => {
             if (cache['posts']) {
                 return cache['posts'];
             }
-            const response = await axiosInstance.get('/posts', { httpAgent });
+            const response = await axiosInstance.get('/posts');
             cache['posts'] = response.data;
             return response.data;
         },
@@ -20,7 +18,7 @@ const resolvers = {
             if (cache['users']) {
                 return cache['users'];
             }
-            const response = await axiosInstance.get('/users', { httpAgent });
+            const response = await axiosInstance.get('/users');
             cache['users'] = response.data;
             return response.data;
         },
@@ -38,7 +36,6 @@ const resolvers = {
         posts: async (user: { id: number }) => {
             const response = await axiosInstance.get('/posts', {
                 params: { userId: user.id },
-                httpAgent
             });
             return response.data;
         }
