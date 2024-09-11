@@ -2,13 +2,11 @@ use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
-    str::FromStr,
     sync::LazyLock,
 };
 
 use anyhow::{anyhow, bail, Context, Result};
 use regex::Regex;
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tokio::{fs, io::AsyncWriteExt};
 use tracing::{info, instrument};
@@ -20,19 +18,19 @@ struct Stats {
     latency_avg: String,
     latency_stdev: String,
     latency_max: String,
-    latency_stdev_percent: Decimal,
-    rps_avg: Decimal,
-    rps_stdev: Decimal,
-    rps_max: Decimal,
-    rps_stdev_percent: Decimal,
+    latency_stdev_percent: u64,
+    rps_avg: u64,
+    rps_stdev: u64,
+    rps_max: u64,
+    rps_stdev_percent: u64,
     total_requests: u64,
-    memory: Decimal,
+    memory: u64,
     connect_errors: u64,
     read_errors: u64,
     write_errors: u64,
     timeout_errors: u64,
     rps: u64,
-    tps: Decimal,
+    tps: u64,
 }
 
 static BENCHES: LazyLock<Result<Vec<String>>> = LazyLock::new(|| {
@@ -187,7 +185,7 @@ fn parse_wrk(output: &Vec<u8>) -> Result<Stats> {
     let (connect_errors, read_errors, write_errors, timeout_errors) = extract_errors(&output_str);
 
     let rps = parse_u64(&output_str, Regex::new(r"Requests\/sec:\s+(\d+).?\d+")?)?;
-    let tps = parse_decimal(&output_str, Regex::new(r"Transfer\/sec:\s+(\d+.?\d+)")?)?;
+    let tps = parse_u64(&output_str, Regex::new(r"Transfer\/sec:\s+(\d+).?\d+")?)?;
 
     Ok(Stats {
         latency_avg,
@@ -207,15 +205,6 @@ fn parse_wrk(output: &Vec<u8>) -> Result<Stats> {
         rps,
         tps,
     })
-}
-
-fn parse_decimal(data: &str, re: Regex) -> anyhow::Result<Decimal> {
-    if let Some(caps) = re.captures(data) {
-        let value = &caps[1];
-        Ok(Decimal::from_str(value)?)
-    } else {
-        bail!("Failed to parse {:?}", re)
-    }
 }
 
 fn parse_u64(data: &str, re: Regex) -> anyhow::Result<u64> {
@@ -393,40 +382,40 @@ mod tests {
     }
 }
 
-fn extract_latency_variables(data: &str) -> anyhow::Result<(String, String, String, Decimal)> {
+fn extract_latency_variables(data: &str) -> anyhow::Result<(String, String, String, u64)> {
     let re = Regex::new(
-        r"Latency\s+(\d+.?\d+[a-z]+)\s+(\d+.?\d+[a-z]+)\s+(\d+.?\d+[a-z]+)\s+(\d+.?\d+)%",
+        r"Latency\s+(\d+.?\d+[a-z]+)\s+(\d+.?\d+[a-z]+)\s+(\d+.?\d+[a-z]+)\s+(\d+).?\d+%",
     )?;
     if let Some(caps) = re.captures(data) {
         Ok((
             caps[1].to_string(),
             caps[2].to_string(),
             caps[3].to_string(),
-            Decimal::from_str(&caps[4])?,
+            caps[4].parse()?,
         ))
     } else {
         bail!("Failed to extract `extract_latency_variables`")
     }
 }
 
-fn extract_rps_variables(data: &str) -> anyhow::Result<(Decimal, Decimal, Decimal, Decimal)> {
-    let re = Regex::new(r"Req\/Sec\s+(\d+.?\d+)\s+(\d+.?\d+)\s+(\d+.?\d+)\s+(\d+.?\d+)%")?;
+fn extract_rps_variables(data: &str) -> anyhow::Result<(u64, u64, u64, u64)> {
+    let re = Regex::new(r"Req\/Sec\s+(\d+).?\d+\s+(\d+).?\d+\s+(\d+).?\d+\s+(\d+).?\d+%")?;
     if let Some(caps) = re.captures(data) {
         Ok((
-            Decimal::from_str(&caps[1])?,
-            Decimal::from_str(&caps[2])?,
-            Decimal::from_str(&caps[3])?,
-            Decimal::from_str(&caps[4])?,
+            caps[1].parse()?,
+            caps[2].parse()?,
+            caps[3].parse()?,
+            caps[4].parse()?,
         ))
     } else {
         bail!("Failed to extract `extract_rps_variables`")
     }
 }
 
-fn extract_totals(data: &str) -> anyhow::Result<(u64, Decimal)> {
-    let re = Regex::new(r"(\d+)\s+requests\s+in\s+\d+.?\d+s,\s+(\d+.?\d+)")?;
+fn extract_totals(data: &str) -> anyhow::Result<(u64, u64)> {
+    let re = Regex::new(r"(\d+)\s+requests\s+in\s+\d+.?\d+s,\s+(\d+).?\d+")?;
     if let Some(caps) = re.captures(data) {
-        Ok((caps[1].parse()?, Decimal::from_str(&caps[2])?))
+        Ok((caps[1].parse()?, caps[2].parse()?))
     } else {
         bail!("Failed to extract `extract_totals`")
     }
