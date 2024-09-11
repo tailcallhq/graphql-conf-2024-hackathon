@@ -1,44 +1,32 @@
-import axios from 'axios';
+import axiosInstance from './axios';
 
 const resolvers = {
     Query: {
-        // Fetch all posts
         posts: async () => {
-            const response = await axios.get('http://localhost:3000/posts');
+            const response = await axiosInstance.get('/posts');
             return response.data;
         },
-
-        // Fetch a single post by ID
         post: async (_: any, { id }: { id: number }) => {
-            const response = await axios.get(`http://localhost:3000/posts/${id}`);
+            const response = await axiosInstance.get(`/posts/${id}`);
             return response.data;
         },
-
-        // Fetch all users
         users: async () => {
-            const response = await axios.get('http://localhost:3000/users');
+            const response = await axiosInstance.get('/users');
             return response.data;
         },
-
-        // Fetch a single user by ID
-        user: async (_: any, { id }: { id: number }) => {
-            const response = await axios.get(`http://localhost:3000/users/${id}`);
-            return response.data;
+        user: async (_: any, { id }: { id: number }, context: any) => {
+            return context?.userDataLoader.load(id);
         }
     },
-
-    // Resolvers for Post type
     Post: {
-        user: async (post: { userId: number }) => {
-            const response = await axios.get(`http://localhost:3000/users/${post.userId}`);
-            return response.data;
+        user: async (post: { userId: number }, args: any, context: any) => {
+            const res = context?.userDataLoader.load(post.userId)
+            return res;
         }
     },
-
-    // Resolvers for User type
     User: {
         posts: async (user: { id: number }) => {
-            const response = await axios.get(`http://localhost:3000/posts`, {
+            const response = await axiosInstance.get('/posts', {
                 params: { userId: user.id }
             });
             return response.data;
