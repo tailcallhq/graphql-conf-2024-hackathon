@@ -42,7 +42,7 @@ impl Query {
         let client = ctx.data_unchecked::<Arc<Client>>();
 
         let response = client.get(ALL_POSTS).send().await?;
-        let posts: Vec<Post> = serde_json::from_value(response.json().await?)?;
+        let posts: Vec<Post> = response.json().await?;
 
         let store = ctx.data_unchecked::<Arc<Store>>();
 
@@ -98,7 +98,7 @@ impl Query {
     ) -> std::result::Result<Vec<User>, async_graphql::Error> {
         let client = ctx.data_unchecked::<Arc<Client>>();
         let response = client.get(ALL_USERS).send().await?;
-        let users: Vec<User> = serde_json::from_value(response.json().await?)?;
+        let users: Vec<User> = response.json().await?;
         Ok(users)
     }
 
@@ -248,7 +248,7 @@ fn create_schema() -> Schema<Query, EmptyMutation, EmptySubscription> {
     let user_loader =
         DataLoader::new(UserLoader(client.clone()), tokio::spawn).delay(Duration::from_millis(1));
     let post_loader =
-        DataLoader::new(PostLoader(client.clone()), tokio::spawn).delay(Duration::from_millis(1));
+        DataLoader::new(PostLoader(client.clone()), tokio::spawn).delay(Duration::from_millis(5));
     Schema::build(Query, EmptyMutation, EmptySubscription)
         .data(client)
         .data(user_loader)
