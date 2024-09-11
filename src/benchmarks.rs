@@ -15,7 +15,7 @@ use tracing::{info, instrument};
 
 use crate::{command::Command, ROOT_DIR};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 struct Stats {
     latency_avg: String,
     latency_stdev: String,
@@ -31,7 +31,7 @@ struct Stats {
     read_errors: u64,
     write_errors: u64,
     timeout_errors: u64,
-    rps: Decimal,
+    rps: u64,
     tps: Decimal,
 }
 
@@ -81,7 +81,6 @@ impl AllStats {
             let baseline_stats = baseline
                 .get(key)
                 .context("Cannot find specific key in baseline stats")?;
-
             sum += 1000 * stats.rps / baseline_stats.rps;
         }
 
@@ -178,76 +177,16 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
 fn parse_wrk(output: &Vec<u8>) -> Result<Stats> {
     let output_str = String::from_utf8_lossy(output);
 
-    let latency_avg = parse_string(
-        &output_str,
-        Regex::new(r"Latency\s+(\d+.?\d+[a-z]+)\s+\d+.?\d+[a-z]+\s+\d+.?\d+[a-z]+\s+\d+.?\d+%")?,
-    )?;
-    let latency_stdev = parse_string(
-        &output_str,
-        Regex::new(r"Latency\s+\d+.?\d+[a-z]+\s+(\d+.?\d+[a-z]+)\s+\d+.?\d+[a-z]+\s+\d+.?\d+%")?,
-    )?;
-    let latency_max = parse_string(
-        &output_str,
-        Regex::new(r"Latency\s+\d+.?\d+[a-z]+\s+\d+.?\d+[a-z]+\s+(\d+.?\d+[a-z]+)\s+\d+.?\d+%")?,
-    )?;
-    let latency_stdev_percent = parse_decimal(
-        &output_str,
-        Regex::new(r"Latency\s+\d+.?\d+[a-z]+\s+\d+.?\d+[a-z]+\s+\d+.?\d+[a-z]+\s+(\d+.?\d+)%")?,
-    )?;
-    let rps_avg = parse_decimal(
-        &output_str,
-        Regex::new(r"Req\/Sec\s+(\d+.?\d+)\s+\d+.?\d+\s+\d+.?\d+\s+\d+.?\d+%")?,
-    )?;
-    let rps_stdev = parse_decimal(
-        &output_str,
-        Regex::new(r"Req\/Sec\s+\d+.?\d+\s+(\d+.?\d+)\s+\d+.?\d+\s+\d+.?\d+%")?,
-    )?;
-    let rps_max = parse_decimal(
-        &output_str,
-        Regex::new(r"Req\/Sec\s+\d+.?\d+\s+\d+.?\d+\s+(\d+.?\d+)\s+\d+.?\d+%")?,
-    )?;
-    let rps_stdev_percent = parse_decimal(
-        &output_str,
-        Regex::new(r"Req\/Sec\s+\d+.?\d+\s+\d+.?\d+\s+\d+.?\d+\s+(\d+.?\d+)%")?,
-    )?;
+    let (latency_avg, latency_stdev, latency_max, latency_stdev_percent) =
+        extract_latency_variables(&output_str)?;
 
-    let total_requests = parse_u64(
-        &output_str,
-        Regex::new(r"(\d+)\s+requests\s+in\s+\d+.?\d+s,\s+\d+.?\d+")?,
-    )?;
-    let memory = parse_decimal(
-        &output_str,
-        Regex::new(r"\d+\s+requests\s+in\s+\d+.?\d+s,\s+(\d+.?\d+)")?,
-    )?;
-    let connect_errors = parse_u64(
-        &output_str,
-        Regex::new(
-            r"Socket\s+errors:\s+connect\s+\d+,\s+read\s+\d+.\s+write\s+\d+.\s+timeout\s+\d+",
-        )?,
-    )
-    .unwrap_or(0);
-    let read_errors = parse_u64(
-        &output_str,
-        Regex::new(
-            r"Socket\s+errors:\s+connect\s+(\d+),\s+read\s+\d+.\s+write\s+\d+.\s+timeout\s+\d+",
-        )?,
-    )
-    .unwrap_or(0);
-    let write_errors = parse_u64(
-        &output_str,
-        Regex::new(
-            r"Socket\s+errors:\s+connect\s+\d+,\s+read\s+(\d+).\s+write\s+\d+.\s+timeout\s+\d+",
-        )?,
-    )
-    .unwrap_or(0);
-    let timeout_errors = parse_u64(
-        &output_str,
-        Regex::new(
-            r"Socket\s+errors:\s+connect\s+\d+,\s+read\s+\d+.\s+write\s+(\d+).\s+timeout\s+(\d+)",
-        )?,
-    )
-    .unwrap_or(0);
-    let rps = parse_decimal(&output_str, Regex::new(r"Requests\/sec:\s+(\d+.?\d+)")?)?;
+    let (rps_avg, rps_stdev, rps_max, rps_stdev_percent) = extract_rps_variables(&output_str)?;
+
+    let (total_requests, memory) = extract_totals(&output_str)?;
+
+    let (connect_errors, read_errors, write_errors, timeout_errors) = extract_errors(&output_str);
+
+    let rps = parse_u64(&output_str, Regex::new(r"Requests\/sec:\s+(\d+).?\d+")?)?;
     let tps = parse_decimal(&output_str, Regex::new(r"Transfer\/sec:\s+(\d+.?\d+)")?)?;
 
     Ok(Stats {
@@ -288,15 +227,6 @@ fn parse_u64(data: &str, re: Regex) -> anyhow::Result<u64> {
     }
 }
 
-fn parse_string(data: &str, re: Regex) -> anyhow::Result<String> {
-    if let Some(caps) = re.captures(data) {
-        let value = &caps[1];
-        Ok(value.to_string())
-    } else {
-        bail!("Failed to parse {:?}", re)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     mod stats {
@@ -306,15 +236,51 @@ mod tests {
         fn test_score_example() {
             let mut stats = AllStats::default();
 
-            stats.insert("posts-title".to_owned(), Stats { rps: 100 });
-            stats.insert("posts-with-user".to_owned(), Stats { rps: 40 });
-            stats.insert("posts-nested".to_owned(), Stats { rps: 60 });
+            stats.insert(
+                "posts-title".to_owned(),
+                Stats {
+                    rps: 100,
+                    ..Default::default()
+                },
+            );
+            stats.insert(
+                "posts-with-user".to_owned(),
+                Stats {
+                    rps: 40,
+                    ..Default::default()
+                },
+            );
+            stats.insert(
+                "posts-nested".to_owned(),
+                Stats {
+                    rps: 60,
+                    ..Default::default()
+                },
+            );
 
             let mut baseline = AllStats::default();
 
-            baseline.insert("posts-title".to_owned(), Stats { rps: 50 });
-            baseline.insert("posts-with-user".to_owned(), Stats { rps: 50 });
-            baseline.insert("posts-nested".to_owned(), Stats { rps: 50 });
+            baseline.insert(
+                "posts-title".to_owned(),
+                Stats {
+                    rps: 50,
+                    ..Default::default()
+                },
+            );
+            baseline.insert(
+                "posts-with-user".to_owned(),
+                Stats {
+                    rps: 50,
+                    ..Default::default()
+                },
+            );
+            baseline.insert(
+                "posts-nested".to_owned(),
+                Stats {
+                    rps: 50,
+                    ..Default::default()
+                },
+            );
 
             assert_eq!(stats.score(&baseline).unwrap(), 1333);
         }
@@ -323,15 +289,51 @@ mod tests {
         fn test_score_equal() {
             let mut stats = AllStats::default();
 
-            stats.insert("posts-title".to_owned(), Stats { rps: 100 });
-            stats.insert("posts-with-user".to_owned(), Stats { rps: 60 });
-            stats.insert("posts-nested".to_owned(), Stats { rps: 40 });
+            stats.insert(
+                "posts-title".to_owned(),
+                Stats {
+                    rps: 100,
+                    ..Default::default()
+                },
+            );
+            stats.insert(
+                "posts-with-user".to_owned(),
+                Stats {
+                    rps: 60,
+                    ..Default::default()
+                },
+            );
+            stats.insert(
+                "posts-nested".to_owned(),
+                Stats {
+                    rps: 40,
+                    ..Default::default()
+                },
+            );
 
             let mut baseline = AllStats::default();
 
-            baseline.insert("posts-title".to_owned(), Stats { rps: 100 });
-            baseline.insert("posts-with-user".to_owned(), Stats { rps: 60 });
-            baseline.insert("posts-nested".to_owned(), Stats { rps: 40 });
+            baseline.insert(
+                "posts-title".to_owned(),
+                Stats {
+                    rps: 100,
+                    ..Default::default()
+                },
+            );
+            baseline.insert(
+                "posts-with-user".to_owned(),
+                Stats {
+                    rps: 60,
+                    ..Default::default()
+                },
+            );
+            baseline.insert(
+                "posts-nested".to_owned(),
+                Stats {
+                    rps: 40,
+                    ..Default::default()
+                },
+            );
 
             assert_eq!(stats.score(&baseline).unwrap(), 1000);
         }
@@ -340,17 +342,109 @@ mod tests {
         fn test_score_less() {
             let mut stats = AllStats::default();
 
-            stats.insert("posts-title".to_owned(), Stats { rps: 20 });
-            stats.insert("posts-with-user".to_owned(), Stats { rps: 10 });
-            stats.insert("posts-nested".to_owned(), Stats { rps: 5 });
+            stats.insert(
+                "posts-title".to_owned(),
+                Stats {
+                    rps: 20,
+                    ..Default::default()
+                },
+            );
+            stats.insert(
+                "posts-with-user".to_owned(),
+                Stats {
+                    rps: 10,
+                    ..Default::default()
+                },
+            );
+            stats.insert(
+                "posts-nested".to_owned(),
+                Stats {
+                    rps: 5,
+                    ..Default::default()
+                },
+            );
 
             let mut baseline = AllStats::default();
 
-            baseline.insert("posts-title".to_owned(), Stats { rps: 40 });
-            baseline.insert("posts-with-user".to_owned(), Stats { rps: 30 });
-            baseline.insert("posts-nested".to_owned(), Stats { rps: 20 });
+            baseline.insert(
+                "posts-title".to_owned(),
+                Stats {
+                    rps: 40,
+                    ..Default::default()
+                },
+            );
+            baseline.insert(
+                "posts-with-user".to_owned(),
+                Stats {
+                    rps: 30,
+                    ..Default::default()
+                },
+            );
+            baseline.insert(
+                "posts-nested".to_owned(),
+                Stats {
+                    rps: 20,
+                    ..Default::default()
+                },
+            );
 
             assert_eq!(stats.score(&baseline).unwrap(), 361);
         }
+    }
+}
+
+fn extract_latency_variables(data: &str) -> anyhow::Result<(String, String, String, Decimal)> {
+    let re = Regex::new(
+        r"Latency\s+(\d+.?\d+[a-z]+)\s+(\d+.?\d+[a-z]+)\s+(\d+.?\d+[a-z]+)\s+(\d+.?\d+)%",
+    )?;
+    if let Some(caps) = re.captures(data) {
+        Ok((
+            caps[1].to_string(),
+            caps[2].to_string(),
+            caps[3].to_string(),
+            Decimal::from_str(&caps[4])?,
+        ))
+    } else {
+        bail!("Failed to extract `extract_latency_variables`")
+    }
+}
+
+fn extract_rps_variables(data: &str) -> anyhow::Result<(Decimal, Decimal, Decimal, Decimal)> {
+    let re = Regex::new(r"Req\/Sec\s+(\d+.?\d+)\s+(\d+.?\d+)\s+(\d+.?\d+)\s+(\d+.?\d+)%")?;
+    if let Some(caps) = re.captures(data) {
+        Ok((
+            Decimal::from_str(&caps[1])?,
+            Decimal::from_str(&caps[2])?,
+            Decimal::from_str(&caps[3])?,
+            Decimal::from_str(&caps[4])?,
+        ))
+    } else {
+        bail!("Failed to extract `extract_rps_variables`")
+    }
+}
+
+fn extract_totals(data: &str) -> anyhow::Result<(u64, Decimal)> {
+    let re = Regex::new(r"(\d+)\s+requests\s+in\s+\d+.?\d+s,\s+(\d+.?\d+)")?;
+    if let Some(caps) = re.captures(data) {
+        Ok((caps[1].parse()?, Decimal::from_str(&caps[2])?))
+    } else {
+        bail!("Failed to extract `extract_totals`")
+    }
+}
+
+fn extract_errors(data: &str) -> (u64, u64, u64, u64) {
+    let re = Regex::new(
+        r"Socket\s+errors:\s+connect\s+(\d+),\s+read\s+(\d+).\s+write\s+(\d+).\s+timeout\s+(\d+)",
+    )
+    .unwrap();
+    if let Some(caps) = re.captures(data) {
+        (
+            caps[1].parse().unwrap_or(0),
+            caps[2].parse().unwrap_or(0),
+            caps[3].parse().unwrap_or(0),
+            caps[4].parse().unwrap_or(0),
+        )
+    } else {
+        (0, 0, 0, 0)
     }
 }

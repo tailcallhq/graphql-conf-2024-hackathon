@@ -1,11 +1,56 @@
 {
   "posts-nested": {
-    "rps": 6002
+    "latency_avg": "0",
+    "latency_stdev": "0",
+    "latency_max": "0",
+    "latency_stdev_percent": "0",
+    "rps_avg": "0",
+    "rps_stdev": "0",
+    "rps_max": "0",
+    "rps_stdev_percent": "0",
+    "total_requests":0,
+    "memory": "0",
+    "connect_errors": 0,
+    "read_errors": 0,
+    "write_errors": 0,
+    "timeout_errors": 0,
+    "rps": 6002,
+    "tps": "0"
   },
   "posts-title": {
-    "rps": 11864
+    "latency_avg": "0",
+    "latency_stdev": "0",
+    "latency_max": "0",
+    "latency_stdev_percent": "0",
+    "rps_avg": "0",
+    "rps_stdev": "0",
+    "rps_max": "0",
+    "rps_stdev_percent": "0",
+    "total_requests":0,
+    "memory": "0",
+    "connect_errors": 0,
+    "read_errors": 0,
+    "write_errors": 0,
+    "timeout_errors": 0,
+    "rps": 11864,
+    "tps": "0"
   },
   "posts-with-user": {
-    "rps": 6011
+    "latency_avg": "0",
+    "latency_stdev": "0",
+    "latency_max": "0",
+    "latency_stdev_percent": "0",
+    "rps_avg": "0",
+    "rps_stdev": "0",
+    "rps_max": "0",
+    "rps_stdev_percent": "0",
+    "total_requests":0,
+    "memory": "0",
+    "connect_errors": 0,
+    "read_errors": 0,
+    "write_errors": 0,
+    "timeout_errors": 0,
+    "rps": 6011,
+    "tps": "0"
   }
 }
