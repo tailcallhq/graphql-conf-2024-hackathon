@@ -12,6 +12,8 @@ use std::{
 };
 
 const BASE_URL: &str = "http://localhost:3000";
+const ALL_USERS: &str = "http://localhost:3000/users";
+const ALL_POSTS: &str = "http://localhost:3000/posts";
 
 struct Store {
     post: RwLock<HashMap<i32, Post>>,  // Change Mutex to RwLock
@@ -47,7 +49,7 @@ impl Query {
     ) -> std::result::Result<Vec<Post>, async_graphql::Error> {
         let client = ctx.data_unchecked::<Arc<Client>>();
 
-        let response = client.get(format!("{}/posts", BASE_URL)).send().await?;
+        let response = client.get(ALL_POSTS).send().await?;
         let posts: Vec<Post> = serde_json::from_value(response.json().await?)?;
 
         let store = ctx.data_unchecked::<Arc<Store>>();
@@ -107,7 +109,7 @@ impl Query {
         ctx: &Context<'_>,
     ) -> std::result::Result<Vec<User>, async_graphql::Error> {
         let client = ctx.data_unchecked::<Arc<Client>>();
-        let response = client.get(format!("{}/users", BASE_URL)).send().await?;
+        let response = client.get(ALL_USERS).send().await?;
         let users: Vec<User> = serde_json::from_value(response.json().await?)?;
         Ok(users)
     }
