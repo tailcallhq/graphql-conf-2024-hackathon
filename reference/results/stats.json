@@ -4,20 +4,20 @@
     "read_errors": 0,
     "write_errors": 0,
     "timeout_errors": 0,
-    "rps": 6002
+    "rps": 6112
   },
   "posts-title": {
     "connect_errors": 0,
     "read_errors": 0,
     "write_errors": 0,
     "timeout_errors": 0,
-    "rps": 11864
+    "rps": 11780
   },
   "posts-with-user": {
     "connect_errors": 0,
     "read_errors": 0,
     "write_errors": 0,
     "timeout_errors": 0,
-    "rps": 6011
+    "rps": 6030
   }
 }
