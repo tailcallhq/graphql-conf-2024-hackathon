@@ -99,7 +99,7 @@ impl Mustache {
         PathStringEval::new().eval(self, value)
     }
 
-/*    pub fn render_graphql(&self, value: &impl PathGraphql) -> String {
+    /*    pub fn render_graphql(&self, value: &impl PathGraphql) -> String {
         PathGraphqlEval::new().eval(self, value)
     }*/
 }

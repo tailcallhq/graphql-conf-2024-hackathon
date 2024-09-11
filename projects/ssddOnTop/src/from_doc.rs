@@ -1,7 +1,11 @@
 use crate::config::{Arg, Cache, Config, Field, Resolver, RootSchema, Server, Type1, Upstream};
 use crate::directive::DirectiveCodec;
 use anyhow::Result;
-use async_graphql::parser::types::{ConstDirective, FieldDefinition, InputObjectType, InputValueDefinition, InterfaceType, ObjectType, SchemaDefinition, ServiceDocument, Type, TypeDefinition, TypeKind, TypeSystemDefinition};
+use async_graphql::parser::types::{
+    ConstDirective, FieldDefinition, InputObjectType, InputValueDefinition, InterfaceType,
+    ObjectType, SchemaDefinition, ServiceDocument, Type, TypeDefinition, TypeKind,
+    TypeSystemDefinition,
+};
 use async_graphql::{Name, Positioned};
 use std::collections::BTreeMap;
 
@@ -29,7 +33,6 @@ pub fn from_doc(doc: ServiceDocument) -> Result<Config> {
     let upstream = upstream(sd)?;
     let schema = schema_definition(&doc).map(to_root_schema)?;
 
-
     Ok(Config {
         types,
         upstream,
@@ -45,15 +48,15 @@ fn to_root_schema(schema_definition: &SchemaDefinition) -> RootSchema {
         .as_ref()
         .map(pos_name_to_string);
 
-    RootSchema { query, mutation, subscription }
+    RootSchema {
+        query,
+        mutation,
+        subscription,
+    }
 }
 fn upstream(schema_definition: &SchemaDefinition) -> Result<Upstream> {
-    process_schema_directives(
-        schema_definition,
-        Upstream::directive_name().as_str(),
-    )
+    process_schema_directives(schema_definition, Upstream::directive_name().as_str())
 }
-
 
 fn schema_definition(doc: &ServiceDocument) -> Result<&SchemaDefinition> {
     doc.definitions
@@ -82,7 +85,6 @@ fn process_schema_directives<T: DirectiveCodec + Default>(
     res
 }
 
-
 fn pos_name_to_string(pos: &Positioned<Name>) -> String {
     pos.node.to_string()
 }
@@ -94,18 +96,17 @@ fn to_types(
     for type_definition in type_definitions.iter() {
         let type_name = pos_name_to_string(&type_definition.node.name);
         let ty = match type_definition.node.kind.clone() {
-            TypeKind::Object(object_type) => to_object_type(
-                &object_type,
-                &type_definition.node.directives,
-            ),
-            TypeKind::Interface(interface_type) => to_object_type(
-                &interface_type,
-                &type_definition.node.directives,
-            ),
-            TypeKind::InputObject(input_object_type) => to_input_object(
-                input_object_type,
-            ),
-            _ => Err(anyhow::anyhow!("Unsupported type kind: {:?}", type_definition.node.kind)),
+            TypeKind::Object(object_type) => {
+                to_object_type(&object_type, &type_definition.node.directives)
+            }
+            TypeKind::Interface(interface_type) => {
+                to_object_type(&interface_type, &type_definition.node.directives)
+            }
+            TypeKind::InputObject(input_object_type) => to_input_object(input_object_type),
+            _ => Err(anyhow::anyhow!(
+                "Unsupported type kind: {:?}",
+                type_definition.node.kind
+            )),
         }?;
 
         map.insert(type_name, ty);
@@ -114,13 +115,12 @@ fn to_types(
     Ok(map)
 }
 
-fn to_input_object(
-    input_object_type: InputObjectType,
-) -> Result<Type1> {
+fn to_input_object(input_object_type: InputObjectType) -> Result<Type1> {
     let fields = to_input_object_fields(&input_object_type.fields)?;
-    Ok(
-        Type1 { fields, ..Default::default() }
-    )
+    Ok(Type1 {
+        fields,
+        ..Default::default()
+    })
 }
 
 fn to_input_object_fields(
@@ -130,31 +130,21 @@ fn to_input_object_fields(
 }
 
 fn to_input_object_field(field_definition: &InputValueDefinition) -> Result<Field> {
-    to_common_field(
-        field_definition,
-        BTreeMap::new(),
-    )
+    to_common_field(field_definition, BTreeMap::new())
 }
 
-fn to_object_type<T>(
-    object: &T,
-    directives: &[Positioned<ConstDirective>],
-) -> Result<Type1>
+fn to_object_type<T>(object: &T, directives: &[Positioned<ConstDirective>]) -> Result<Type1>
 where
     T: ObjectLike,
 {
     let fields = object.fields();
 
-    let cache= Cache::from_directives(directives.iter())?;
+    let cache = Cache::from_directives(directives.iter())?;
     let fields = to_fields(fields)?;
-    Ok(
-        Type1 { fields, cache }
-    )
+    Ok(Type1 { fields, cache })
 }
 
-fn to_fields(
-    fields: &Vec<Positioned<FieldDefinition>>,
-) -> Result<BTreeMap<String, Field>> {
+fn to_fields(fields: &Vec<Positioned<FieldDefinition>>) -> Result<BTreeMap<String, Field>> {
     to_fields_inner(fields, to_field)
 }
 
@@ -180,10 +170,7 @@ fn to_field(field_definition: &FieldDefinition) -> Result<Field> {
     to_common_field(field_definition, to_args(field_definition))
 }
 
-fn to_common_field<F>(
-    field: &F,
-    args: BTreeMap<String, Arg>,
-) -> Result<Field>
+fn to_common_field<F>(field: &F, args: BTreeMap<String, Arg>) -> Result<Field>
 where
     F: FieldLike + HasName,
 {
@@ -191,13 +178,11 @@ where
     let directives = field.directives();
 
     let resolver = Resolver::from_directives(directives.iter())?;
-    Ok(
-        Field {
-            ty_of: type_of.into(),
-            args,
-            resolver,
-        }
-    )
+    Ok(Field {
+        ty_of: type_of.into(),
+        args,
+        resolver,
+    })
 }
 
 fn to_args(field_definition: &FieldDefinition) -> BTreeMap<String, Arg> {
@@ -212,7 +197,6 @@ fn to_args(field_definition: &FieldDefinition) -> BTreeMap<String, Arg> {
     args
 }
 
-
 fn to_arg(input_value_definition: &InputValueDefinition) -> Arg {
     let type_of = &input_value_definition.ty.node;
 
@@ -222,9 +206,11 @@ fn to_arg(input_value_definition: &InputValueDefinition) -> Arg {
     } else {
         None
     };
-    Arg { type_of: type_of.into(), default_value }
+    Arg {
+        type_of: type_of.into(),
+        default_value,
+    }
 }
-
 
 trait HasName {
     fn name(&self) -> &Positioned<Name>;

@@ -1,4 +1,7 @@
-use std::{fs, sync::{Arc, Mutex}};
+use std::{
+    fs,
+    sync::{Arc, Mutex},
+};
 
 use anyhow::Result;
 use mock_json::{mock, registry, MockFn};
@@ -74,7 +77,7 @@ fn main() -> Result<()> {
 
     generate(&template, 1)?;
     ordered_number_mock.reset();
-	generate(&template, 2)?;
+    generate(&template, 2)?;
     ordered_number_mock.reset();
     generate(&template, 3)?;
 

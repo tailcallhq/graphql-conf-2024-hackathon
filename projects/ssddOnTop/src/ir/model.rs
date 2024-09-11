@@ -1,5 +1,5 @@
-use std::num::NonZeroU64;
 use crate::http;
+use std::num::NonZeroU64;
 // use crate::jit::eval_ctx::EvalContext;
 
 #[derive(Clone, Debug)]
@@ -45,7 +45,7 @@ pub enum IO {
     Http {
         req_template: http::RequestTemplate,
         dl_id: Option<DataLoaderId>,
-    }
+    },
 }
 
 /*impl<'a> IO {

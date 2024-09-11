@@ -66,7 +66,9 @@ impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
         match self {
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg).into_response(),
-            AppError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response(),
+            AppError::InternalServerError(msg) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response()
+            }
         }
     }
 }

@@ -4,8 +4,6 @@ fn main() -> anyhow::Result<()> {
         .worker_threads(num_cpus::get())
         .enable_all()
         .build()?;
-    rt.block_on(async {
-        tracing::info!("{}",num_cpus::get());
-    });
+    rt.block_on(ssddOnTop::run::run())?;
     Ok(())
 }

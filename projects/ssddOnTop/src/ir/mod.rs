@@ -1,5 +1,5 @@
-mod model;
 mod discriminator;
+mod model;
 
-pub use model::*;
 pub use discriminator::*;
+pub use model::*;

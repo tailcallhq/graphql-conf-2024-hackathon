@@ -52,7 +52,10 @@ impl std::fmt::Debug for Type {
 
 impl Default for Type {
     fn default() -> Self {
-        Type::Named { name: "JSON".to_string(), non_null: false }
+        Type::Named {
+            name: "JSON".to_string(),
+            non_null: false,
+        }
     }
 }
 
@@ -80,22 +83,37 @@ impl Type {
     /// convert this type into NonNull type
     pub fn into_required(self) -> Self {
         match self {
-            Type::Named { name, .. } => Self::Named { name, non_null: true },
-            Type::List { of_type, .. } => Self::List { of_type, non_null: true },
+            Type::Named { name, .. } => Self::Named {
+                name,
+                non_null: true,
+            },
+            Type::List { of_type, .. } => Self::List {
+                of_type,
+                non_null: true,
+            },
         }
     }
 
     /// convert this into nullable type
     pub fn into_nullable(self) -> Self {
         match self {
-            Type::Named { name, .. } => Self::Named { name, non_null: false },
-            Type::List { of_type, .. } => Self::List { of_type, non_null: false },
+            Type::Named { name, .. } => Self::Named {
+                name,
+                non_null: false,
+            },
+            Type::List { of_type, .. } => Self::List {
+                of_type,
+                non_null: false,
+            },
         }
     }
 
     /// create a nullable list type from this type
     pub fn into_list(self) -> Self {
-        Type::List { of_type: Box::new(self), non_null: false }
+        Type::List {
+            of_type: Box::new(self),
+            non_null: false,
+        }
     }
 
     /// convert this type from list to non-list for any level of nesting
@@ -110,9 +128,10 @@ impl Type {
     pub fn with_name(self, name: String) -> Self {
         match self {
             Type::Named { non_null, .. } => Type::Named { name, non_null },
-            Type::List { of_type, non_null } => {
-                Type::List { of_type: Box::new(of_type.with_name(name)), non_null }
-            }
+            Type::List { of_type, non_null } => Type::List {
+                of_type: Box::new(of_type.with_name(name)),
+                non_null,
+            },
         }
     }
 }
@@ -122,12 +141,14 @@ impl From<&async_graphql_types::Type> for Type {
         let non_null = !value.nullable;
 
         match &value.base {
-            async_graphql_types::BaseType::Named(name) => {
-                Self::Named { name: name.to_string(), non_null }
-            }
-            async_graphql_types::BaseType::List(type_) => {
-                Self::List { of_type: Box::new(type_.as_ref().into()), non_null }
-            }
+            async_graphql_types::BaseType::Named(name) => Self::Named {
+                name: name.to_string(),
+                non_null,
+            },
+            async_graphql_types::BaseType::List(type_) => Self::List {
+                of_type: Box::new(type_.as_ref().into()),
+                non_null,
+            },
         }
     }
 }
@@ -170,6 +191,9 @@ impl From<&Type> for async_graphql::dynamic::TypeRef {
 
 impl From<String> for Type {
     fn from(value: String) -> Self {
-        Self::Named { name: value, non_null: false }
+        Self::Named {
+            name: value,
+            non_null: false,
+        }
     }
 }

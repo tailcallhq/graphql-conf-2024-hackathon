@@ -1,5 +1,5 @@
-use std::fmt::{Debug, Formatter};
 use crate::ir::IR;
+use std::fmt::{Debug, Formatter};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FieldName(pub String);

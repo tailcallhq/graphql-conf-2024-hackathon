@@ -1,10 +1,9 @@
-use reqwest::header::HeaderName;
-use anyhow::Result;
 use crate::config::KeyValue;
 use crate::mustache::model::Mustache;
+use anyhow::Result;
+use reqwest::header::HeaderName;
 
 pub type MustacheHeaders = Vec<(HeaderName, Mustache)>;
-
 
 pub fn to_mustache_headers(headers: &[KeyValue]) -> Result<MustacheHeaders> {
     let mut ans = vec![];
@@ -19,11 +18,11 @@ pub fn to_mustache_headers(headers: &[KeyValue]) -> Result<MustacheHeaders> {
 
 #[cfg(test)]
 mod tests {
+    use super::to_mustache_headers;
+    use crate::config::KeyValue;
+    use crate::mustache::model::Mustache;
     use anyhow::Result;
     use hyper::header::HeaderName;
-    use crate::config::KeyValue;
-    use super::to_mustache_headers;
-    use crate::mustache::model::Mustache;
 
     #[test]
     fn valid_headers() -> Result<()> {

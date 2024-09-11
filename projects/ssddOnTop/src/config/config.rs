@@ -1,10 +1,10 @@
 use crate::blueprint::wrapping_type;
 use crate::config::url_query::URLQuery;
+use crate::http::method::Method;
 use crate::is_default;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::num::NonZeroU64;
-use crate::http::method::Method;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
@@ -23,8 +23,7 @@ pub struct RootSchema {
     pub subscription: Option<String>,
 }
 
-
-#[derive(Serialize, Deserialize,Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Server {
     #[serde(default, skip_serializing_if = "is_default")]
     pub port: u16,
@@ -32,13 +31,11 @@ pub struct Server {
 
 impl Default for Server {
     fn default() -> Self {
-        Server {
-            port: 8000,
-        }
+        Server { port: 8000 }
     }
 }
 
-#[derive(Serialize, Deserialize,Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Upstream {
     #[serde(rename = "baseURL", default, skip_serializing_if = "is_default")]
     pub base_url: Option<String>,
@@ -94,7 +91,6 @@ pub struct Http {
     #[serde(default, skip_serializing_if = "is_default")]
     pub query: Vec<URLQuery>,
 }
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Resolver {

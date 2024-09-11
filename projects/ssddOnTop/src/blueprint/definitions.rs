@@ -1,54 +1,54 @@
 use crate::blueprint::operators::http::update_http;
-use crate::blueprint::{Definition, FieldDefinition, InputFieldDefinition, InputObjectTypeDefinition, InterfaceTypeDefinition, ObjectTypeDefinition};
+use crate::blueprint::{
+    Definition, FieldDefinition, InputFieldDefinition, InputObjectTypeDefinition,
+    InterfaceTypeDefinition, ObjectTypeDefinition,
+};
 use crate::config;
 use crate::config::Config;
 
 pub fn to_definitions(config: &Config) -> anyhow::Result<Vec<Definition>> {
     let mut definitions = vec![];
     for (ty_name, ty) in config.types.iter() {
-        let def = to_object_type_definition(ty_name, ty, config).and_then(|definition| match definition {
-            Definition::Object(_) => {
-                Ok(definition)
-                /*if config.input_types().contains(ty_name) {
-                    to_input_object_type_definition(object_type_definition)
-                } else if config.interface_types().contains(ty_name) {
-                    to_interface_type_definition(object_type_definition)
-                } else {
-                    Ok(definition)
-                }*/
-            }
-            _ => Ok(definition),
-        })?;
+        let def =
+            to_object_type_definition(ty_name, ty, config).and_then(
+                |definition| match definition {
+                    Definition::Object(_) => {
+                        Ok(definition)
+                        /*if config.input_types().contains(ty_name) {
+                            to_input_object_type_definition(object_type_definition)
+                        } else if config.interface_types().contains(ty_name) {
+                            to_interface_type_definition(object_type_definition)
+                        } else {
+                            Ok(definition)
+                        }*/
+                    }
+                    _ => Ok(definition),
+                },
+            )?;
         definitions.push(def);
     }
     Ok(definitions)
 }
 
 fn to_interface_type_definition(definition: ObjectTypeDefinition) -> anyhow::Result<Definition> {
-    Ok(
-        Definition::Interface(InterfaceTypeDefinition {
-            name: definition.name,
-            fields: definition.fields,
-        })
-    )
+    Ok(Definition::Interface(InterfaceTypeDefinition {
+        name: definition.name,
+        fields: definition.fields,
+    }))
 }
 
-fn to_input_object_type_definition(
-    definition: ObjectTypeDefinition,
-) -> anyhow::Result<Definition> {
-    Ok(
-        Definition::InputObject(InputObjectTypeDefinition {
-            name: definition.name,
-            fields: definition
-                .fields
-                .iter()
-                .map(|field| InputFieldDefinition {
-                    name: field.name.clone(),
-                    of_type: field.of_type.clone(),
-                })
-                .collect(),
-        })
-    )
+fn to_input_object_type_definition(definition: ObjectTypeDefinition) -> anyhow::Result<Definition> {
+    Ok(Definition::InputObject(InputObjectTypeDefinition {
+        name: definition.name,
+        fields: definition
+            .fields
+            .iter()
+            .map(|field| InputFieldDefinition {
+                name: field.name.clone(),
+                of_type: field.of_type.clone(),
+            })
+            .collect(),
+    }))
 }
 
 fn to_object_type_definition(
@@ -84,7 +84,6 @@ fn to_fields(
     Ok(fields)
 }
 
-
 fn to_field_definition(
     field_name: &str,
     field: &config::Field,
@@ -101,13 +100,17 @@ fn update_args(
     field: config::Field,
     mut def: FieldDefinition,
 ) -> FieldDefinition {
-    let args = field.args.iter().map(|(name, arg)| {
-        let arg = InputFieldDefinition {
-            name: name.clone(),
-            of_type: arg.type_of.clone(),
-        };
-        arg
-    }).collect::<Vec<_>>();
+    let args = field
+        .args
+        .iter()
+        .map(|(name, arg)| {
+            let arg = InputFieldDefinition {
+                name: name.clone(),
+                of_type: arg.type_of.clone(),
+            };
+            arg
+        })
+        .collect::<Vec<_>>();
 
     def.name = field_name.to_string();
     def.args = args;

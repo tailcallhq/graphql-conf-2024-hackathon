@@ -1,3 +1,5 @@
+use super::*;
+use crate::mustache::model::{Mustache, Segment};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
 use nom::character::complete::char;
@@ -5,8 +7,6 @@ use nom::combinator::map;
 use nom::multi::many0;
 use nom::sequence::delimited;
 use nom::{Finish, IResult};
-use crate::mustache::model::{Mustache, Segment};
-use super::*;
 
 impl Mustache {
     // TODO: infallible function, no need to return Result

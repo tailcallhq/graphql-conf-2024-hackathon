@@ -1,12 +1,12 @@
+use crate::blueprint::definitions::to_definitions;
 use crate::blueprint::model::{Arg, ArgId, Field, FieldId, FieldName, TypeName};
-use crate::config::{Config, GraphQLOperationType};
-use std::collections::{BTreeSet, HashMap};
+use crate::blueprint::wrapping_type::Type;
+use crate::config::Config;
+use crate::ir::IR;
 use derive_setters::Setters;
 use serde_json::Value;
-use crate::blueprint::definitions::to_definitions;
-use crate::blueprint::wrapping_type::Type;
-use crate::config;
-use crate::ir::IR;
+use std::collections::HashMap;
+use std::net::{IpAddr, SocketAddr};
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct FieldHash {
@@ -28,7 +28,6 @@ pub struct Directive {
     pub index: usize,
 }
 
-
 #[derive(Clone, Debug)]
 pub enum Definition {
     Interface(InterfaceTypeDefinition),
@@ -47,7 +46,6 @@ pub struct ObjectTypeDefinition {
     pub name: String,
     pub fields: Vec<FieldDefinition>,
 }
-
 
 #[derive(Clone, Debug)]
 pub struct InterfaceTypeDefinition {
@@ -70,10 +68,16 @@ pub struct InputFieldDefinition {
     pub of_type: Type,
 }
 
-
 #[derive(Debug)]
 pub struct Server {
+    pub host: IpAddr,
     pub port: u16,
+}
+
+impl Server {
+    pub fn addr(&self) -> SocketAddr {
+        SocketAddr::new(self.host, self.port)
+    }
 }
 #[derive(Debug)]
 pub struct Upstream {
@@ -84,12 +88,17 @@ impl TryFrom<&Config> for Blueprint {
     type Error = anyhow::Error;
 
     fn try_from(config: &Config) -> Result<Self, Self::Error> {
-        let qry = config.schema.query.as_ref().ok_or(anyhow::anyhow!("Query not found"))?;
+        let qry = config
+            .schema
+            .query
+            .as_ref()
+            .ok_or(anyhow::anyhow!("Query not found"))?;
         let defs = to_definitions(config)?;
 
         let fields = fields_to_map(qry, config, defs);
 
         let server = Server {
+            host: IpAddr::from([127, 0, 0, 1]),
             port: config.server.port,
         };
         let upstream = Upstream {
@@ -129,34 +138,45 @@ fn populate_nested_field(
                 type_of: field.ty_of.clone(),
                 ir: {
                     let x = defs.iter().find_map(|def| match def {
-                        Definition::Interface(int) => {
-                            Some(int.fields.iter().find(|f| field_name.0.eq(&f.name))?.clone())
-                        }
-                        Definition::Object(obj) => {
-                            Some(obj.fields.iter().find(|f| field_name.0.eq(&f.name))?.clone())
-                        }
-                        Definition::InputObject(_) => {
-                            None
-                        }
+                        Definition::Interface(int) => Some(
+                            int.fields
+                                .iter()
+                                .find(|f| field_name.0.eq(&f.name))?
+                                .clone(),
+                        ),
+                        Definition::Object(obj) => Some(
+                            obj.fields
+                                .iter()
+                                .find(|f| field_name.0.eq(&f.name))?
+                                .clone(),
+                        ),
+                        Definition::InputObject(_) => None,
                     });
                     x.and_then(|x| x.resolver.clone())
                 },
-                args: field.args.iter().map(|(arg_name, arg)| {
-                    let arg = Arg {
-                        id: ArgId::new(arg_id),
-                        name: arg_name.clone(),
-                        type_of: arg.type_of.clone(),
-                    };
-                    arg_id += 1;
+                args: field
+                    .args
+                    .iter()
+                    .map(|(arg_name, arg)| {
+                        let arg = Arg {
+                            id: ArgId::new(arg_id),
+                            name: arg_name.clone(),
+                            type_of: arg.type_of.clone(),
+                        };
+                        arg_id += 1;
 
-                    arg
-                }).collect(),
+                        arg
+                    })
+                    .collect(),
             };
 
-            field_map.insert(FieldHash {
-                name: field_name,
-                id: TypeName(ty_name.to_string()),
-            }, field);
+            field_map.insert(
+                FieldHash {
+                    name: field_name,
+                    id: TypeName(ty_name.to_string()),
+                },
+                field,
+            );
         }
     }
 }
@@ -169,7 +189,9 @@ mod test {
     fn test() {
         let reader = ConfigReader::init();
         let root = env!("CARGO_MANIFEST_DIR");
-        let config = reader.read(format!("{}/schema/schema.graphql", root)).unwrap();
+        let config = reader
+            .read(format!("{}/schema/schema.graphql", root))
+            .unwrap();
         let blueprint = crate::blueprint::Blueprint::try_from(&config).unwrap();
         // println!("{:#?}", blueprint);
     }

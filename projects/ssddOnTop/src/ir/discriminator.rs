@@ -124,12 +124,10 @@ impl FieldInfo {
 impl Discriminator {
     pub fn new(union_name: &str, union_types: &[(&str, &Type1)]) -> Result<Self> {
         if union_types.len() > usize::BITS as usize {
-            return Err(
-                anyhow::anyhow!(
-                    "Union {union_name} defines more than {} types that is not supported",
+            return Err(anyhow::anyhow!(
+                "Union {union_name} defines more than {} types that is not supported",
                 usize::BITS
-                )
-            );
+            ));
         }
 
         let mut types = Vec::with_capacity(union_types.len());
@@ -337,12 +335,12 @@ impl Repr {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::blueprint::wrapping_type::Type;
+    use crate::config::Field;
     use async_graphql::Value;
     use serde_json::json;
     use test_log::test;
-    use crate::blueprint::wrapping_type::Type;
-    use crate::config::Field;
-    use super::*;
 
     #[test]
     fn test_single_distinct_field_optional() {
@@ -393,11 +391,17 @@ mod tests {
     fn test_single_distinct_field_required() {
         let foo = Type1::default().fields(vec![(
             "foo",
-            Field { ty_of: Type::default().into_required(), ..Field::default() },
+            Field {
+                ty_of: Type::default().into_required(),
+                ..Field::default()
+            },
         )]);
         let bar = Type1::default().fields(vec![(
             "bar",
-            Field { ty_of: Type::default().into_required(), ..Field::default() },
+            Field {
+                ty_of: Type::default().into_required(),
+                ..Field::default()
+            },
         )]);
         let types = vec![("Foo", &foo), ("Bar", &bar)];
 
@@ -445,43 +449,70 @@ mod tests {
         let a = Type1::default().fields(vec![
             (
                 "a",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
             (
                 "ab",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
             (
                 "abab",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
         let b = Type1::default().fields(vec![
             (
                 "b",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
             (
                 "ab",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
             (
                 "abab",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
             (
                 "ac",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
         let c = Type1::default().fields(vec![
             (
                 "c",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
             (
                 "ac",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
         let types = vec![("A", &a), ("B", &b), ("C", &c)];
@@ -742,72 +773,108 @@ mod tests {
             ("usual", Field::default()),
             (
                 "payload",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
         let var1_var = Type1::default().fields(vec![
             ("usual", Field::default()),
             (
                 "command",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
         let var_var0 = Type1::default().fields(vec![
             ("usual", Field::default()),
             (
                 "flag",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
         let var_var1 = Type1::default().fields(vec![
             ("usual", Field::default()),
             (
                 "optPayload",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
         let var0_var0 = Type1::default().fields(vec![
             ("usual", Field::default()),
             (
                 "payload",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
             (
                 "flag",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
         let var1_var0 = Type1::default().fields(vec![
             ("usual", Field::default()),
             (
                 "command",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
             (
                 "flag",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
         let var0_var1 = Type1::default().fields(vec![
             ("usual", Field::default()),
             (
                 "payload",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
             (
                 "optPayload",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
         let var1_var1 = Type1::default().fields(vec![
             ("usual", Field::default()),
             (
                 "command",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
             (
                 "optPayload",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
         let types = vec![
@@ -937,7 +1004,10 @@ mod tests {
         let type_b = Type1::default().fields(vec![
             (
                 "uniqueB1",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
             ("common", Field::default()),
         ]);
@@ -950,7 +1020,10 @@ mod tests {
             ("common", Field::default()),
             (
                 "uniqueD2",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
 
@@ -995,7 +1068,7 @@ mod tests {
                     &Value::from_json(
                         json!({ "uniqueD1": "value", "common": 3, "uniqueD2": false })
                     )
-                        .unwrap()
+                    .unwrap()
                 )
                 .unwrap(),
             "TypeD"
@@ -1008,7 +1081,7 @@ mod tests {
                     &Value::from_json(
                         json!({ "uniqueA1": "value", "uniqueB1": true, "common": 4 })
                     )
-                        .unwrap()
+                    .unwrap()
                 )
                 .unwrap(),
             "TypeA"
@@ -1048,7 +1121,10 @@ mod tests {
             ("field2", Field::default()),
             (
                 "field4",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
 
@@ -1094,7 +1170,7 @@ mod tests {
                     &Value::from_json(
                         json!({ "field1": "value", "field2": "value", "field4": "value" })
                     )
-                        .unwrap()
+                    .unwrap()
                 )
                 .unwrap(),
             "TypeD"
@@ -1107,7 +1183,7 @@ mod tests {
                     &Value::from_json(
                         json!({ "field1": "value", "field2": "value", "field3": "value" })
                     )
-                        .unwrap()
+                    .unwrap()
                 )
                 .unwrap_err()
                 .to_string(),
@@ -1141,7 +1217,6 @@ mod tests {
 
         assert_eq!(
             Discriminator::new("BigUnion", &union_types)
-                
                 .unwrap_err()
                 .to_string(),
             format!(
@@ -1155,32 +1230,38 @@ mod tests {
 
     #[test]
     fn test_validation_equal_types() {
-        let a =
-            Type1::default().fields(vec![("a", Field::default()), ("b", Field::default())]);
+        let a = Type1::default().fields(vec![("a", Field::default()), ("b", Field::default())]);
         let b = Type1::default().fields(vec![
             (
                 "a",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
             ("b", Field::default()),
         ]);
-        let c =
-            Type1::default().fields(vec![("a", Field::default()), ("b", Field::default())]);
+        let c = Type1::default().fields(vec![("a", Field::default()), ("b", Field::default())]);
         let d = Type1::default().fields(vec![
             ("a", Field::default()),
             ("b", Field::default()),
             (
                 "c",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
-        let e =
-            Type1::default().fields(vec![("c", Field::default()), ("d", Field::default())]);
+        let e = Type1::default().fields(vec![("c", Field::default()), ("d", Field::default())]);
         let f = Type1::default().fields(vec![
             ("c", Field::default()),
             (
                 "d",
-                Field { ty_of: Type::default().into_required(), ..Field::default() },
+                Field {
+                    ty_of: Type::default().into_required(),
+                    ..Field::default()
+                },
             ),
         ]);
 
@@ -1194,10 +1275,7 @@ mod tests {
         ];
 
         assert_eq!(
-            Discriminator::new("Test", &types)
-                
-                .unwrap_err()
-                .to_string(),
+            Discriminator::new("Test", &types).unwrap_err().to_string(),
             "Validation Error
 • Union have equal types: A == B == C  [Test]
 • Union have equal types: E == F  [Test]

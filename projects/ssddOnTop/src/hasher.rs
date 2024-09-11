@@ -1,5 +1,5 @@
-use std::hash::Hasher;
 use fxhash::FxHasher;
+use std::hash::Hasher;
 
 #[derive(Default)]
 pub struct MyHasher {

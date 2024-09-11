@@ -1,5 +1,5 @@
-use derive_setters::Setters;
 use crate::http::method::Method;
+use derive_setters::Setters;
 
 #[derive(Clone, Debug, Setters)]
 pub struct Endpoint {

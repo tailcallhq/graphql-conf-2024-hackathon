@@ -1,23 +1,20 @@
-use crate::http::method::Method;
 use crate::blueprint::FieldDefinition;
 use crate::config;
 use crate::config::Resolver;
 use crate::endpoint::Endpoint;
+use crate::http::method::Method;
 use crate::http::RequestTemplate;
 use crate::ir::{IO, IR};
 use crate::mustache::model::Mustache;
 
-fn compile_http(
-    config_module: &config::Config,
-    http: &config::Http,
-) -> anyhow::Result<IR> {
+fn compile_http(config_module: &config::Config, http: &config::Http) -> anyhow::Result<IR> {
     let mut base_url = String::new();
     if let Some(base) = http.base_url.clone() {
         base_url = base;
-    }else {
+    } else {
         if let Some(base) = config_module.upstream.base_url.clone() {
             base_url = base;
-        }else {
+        } else {
             return Err(anyhow::anyhow!("No base URL defined"));
         }
     }
@@ -37,10 +34,10 @@ fn compile_http(
         })
         .collect();
 
-    let req_template =  RequestTemplate::try_from(
+    let req_template = RequestTemplate::try_from(
         Endpoint::new(base_url.to_string())
             .method(http.method.clone())
-            .query(query)
+            .query(query),
     )?;
 
     let ir = if http.method == Method::GET {
@@ -55,7 +52,10 @@ fn compile_http(
             dl_id: None,
         })
     } else {
-        IR::IO(IO::Http { req_template, dl_id: None })
+        IR::IO(IO::Http {
+            req_template,
+            dl_id: None,
+        })
     };
 
     Ok(ir)

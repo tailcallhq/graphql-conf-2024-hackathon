@@ -17,7 +17,7 @@ pub trait DirectiveCodec: Sized {
         format!("@{}", Self::directive_name())
     }
     fn from_directives<'a>(
-        directives: impl Iterator<Item=&'a Positioned<ConstDirective>>,
+        directives: impl Iterator<Item = &'a Positioned<ConstDirective>>,
     ) -> Result<Option<Self>> {
         for directive in directives {
             if directive.node.name.node == Self::directive_name() {
@@ -49,10 +49,9 @@ impl<'a, A: Deserialize<'a> + Serialize + 'a> DirectiveCodec for A {
 
     fn from_directive(directive: &ConstDirective) -> Result<A> {
         let mut map = Map::new();
-        for (k,v) in directive.arguments.iter() {
-            let (k,v) = serde_json::to_value(&v.node).map(|v| (k.node.as_str().to_string(), v))?;
-            map.insert(k,v);
-
+        for (k, v) in directive.arguments.iter() {
+            let (k, v) = serde_json::to_value(&v.node).map(|v| (k.node.as_str().to_string(), v))?;
+            map.insert(k, v);
         }
 
         Ok(deserialize(Value::Object(map))?)
@@ -72,6 +71,9 @@ impl<'a, A: Deserialize<'a> + Serialize + 'a> DirectiveCodec for A {
             ));
         }
 
-        ConstDirective { name: pos(Name::new(name)), arguments }
+        ConstDirective {
+            name: pos(Name::new(name)),
+            arguments,
+        }
     }
 }

@@ -33,12 +33,11 @@ impl TryFrom<Endpoint> for RequestTemplate {
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
         let method = endpoint.method.clone().to_hyper();
-/*        let headers = endpoint
-            .headers
-            .iter()
-            .map(|(k, v)| Ok((k.clone(), Mustache::parse(v.to_str()?))))
-            .collect::<anyhow::Result<Vec<_>>>()?;*/
-
+        /*        let headers = endpoint
+        .headers
+        .iter()
+        .map(|(k, v)| Ok((k.clone(), Mustache::parse(v.to_str()?))))
+        .collect::<anyhow::Result<Vec<_>>>()?;*/
 
         Ok(Self {
             root_url: path,

@@ -15,5 +15,7 @@ impl Value {
 }
 
 fn extend_lifetime<'b>(r: serde_json_borrow::Value<'b>) -> serde_json_borrow::Value<'static> {
-    unsafe { std::mem::transmute::<serde_json_borrow::Value<'b>, serde_json_borrow::Value<'static>>(r) }
+    unsafe {
+        std::mem::transmute::<serde_json_borrow::Value<'b>, serde_json_borrow::Value<'static>>(r)
+    }
 }

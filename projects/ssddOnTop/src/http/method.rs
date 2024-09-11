@@ -1,17 +1,7 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
-#[derive(
-    Clone,
-    Debug,
-    Serialize,
-    Deserialize,
-    PartialEq,
-    Eq,
-    Hash,
-    Default,
-    Display,
-)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default, Display)]
 pub enum Method {
     #[default]
     GET,
