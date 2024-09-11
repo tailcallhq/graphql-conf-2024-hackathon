@@ -14,6 +14,7 @@ server.register(mercurius, {
     resolvers,
     context: () => {
         let cache = {};
+        let postsCache = {};
 
         const userDataLoader = new DataLoader(async function (ids: any) {
             const response = await axiosInstance.get('/users', {
@@ -47,7 +48,8 @@ server.register(mercurius, {
         return {
             userDataLoader,
             postDataLoader,
-            cache
+            cache,
+            postsCache
         }
     },
     graphiql: true

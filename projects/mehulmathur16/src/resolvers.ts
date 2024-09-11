@@ -1,18 +1,25 @@
 import axiosInstance from './axios';
-import http from 'http';
 
 const resolvers = {
     Query: {
-        posts: async (_: any, __: any, { cache }: any) => {
+        posts: async (_: any, __: any, { cache, postsCache }: any) => {
             if (cache['posts']) {
                 return cache['posts'];
             }
             const response = await axiosInstance.get('/posts');
             cache['posts'] = response.data;
+
+            response.data.map((currPost: any) => {
+                postsCache[currPost.id] = currPost;
+            })
+
             return response.data;
         },
-        post: async (_: any, { id }: { id: number }, context: any) => {
-            return context?.postDataLoader.load(id);
+        post: async (_: any, { id }: { id: number }, { postsCache, postDataLoader }: any) => {
+            if (postsCache[id]) {
+                return postsCache[id];
+            }
+            return postDataLoader.load(id);
         },
         users: async (_: any, __: any, { cache }: any) => {
             if (cache['users']) {
