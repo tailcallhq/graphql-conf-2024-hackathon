@@ -16,8 +16,8 @@ server.register(mercurius, {
         let cache = {
             usersList: null,
             postsList: null,
-            postMap: {},
-            userMap: {}
+            postMap: {} as any,
+            userMap: {} as any
         };
 
         const userDataLoader = new DataLoader(async function (ids: any) {
@@ -38,7 +38,11 @@ server.register(mercurius, {
             const posts = await Promise.all(
                 ids.map(async (id: any) => {
                     try {
-                        const response = await axiosInstance.get(`/posts/${id}`,);
+                        if (cache.postMap[id]) {
+                            return cache.postMap[id]
+                        }
+                        const response = await axiosInstance.get(`/posts/${id}`);
+                        cache.postMap[id] = response.data;
                         return response.data;
                     } catch (error: any) {
                         return new Error(`Failed to fetch post with id ${id}: ${error.message}`);
