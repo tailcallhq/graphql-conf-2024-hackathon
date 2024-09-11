@@ -7,7 +7,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock}, // Change Mutex to RwLock
+    sync::{Arc, RwLock},
     time::Duration,
 };
 
@@ -16,26 +16,26 @@ const ALL_USERS: &str = "http://localhost:3000/users";
 const ALL_POSTS: &str = "http://localhost:3000/posts";
 
 struct Store {
-    post: RwLock<HashMap<i32, Post>>,  // Change Mutex to RwLock
-    users: RwLock<HashMap<i32, User>>, // Change Mutex to RwLock
-    is_post_same: RwLock<bool>,        // Change Mutex to RwLock
+    post: RwLock<HashMap<i32, Post>>,
+    users: RwLock<HashMap<i32, User>>,
+    is_post_same: RwLock<bool>, // rename to is_dirty.
 }
 
 impl Default for Store {
     fn default() -> Self {
         Self {
-            post: RwLock::new(HashMap::default()), // Change Mutex to RwLock
-            users: RwLock::new(HashMap::default()), // Change Mutex to RwLock
-            is_post_same: RwLock::new(false),      // Change Mutex to RwLock
+            post: RwLock::new(HashMap::default()),
+            users: RwLock::new(HashMap::default()),
+            is_post_same: RwLock::new(false),
         }
     }
 }
 
 impl Store {
     pub fn reset(&self) {
-        self.users.write().unwrap().clear(); // Change lock to write()
-        self.post.write().unwrap().clear(); // Change lock to write()
-        *self.is_post_same.write().unwrap() = false; // Change lock to write()
+        self.users.write().unwrap().clear();
+        self.post.write().unwrap().clear();
+        *self.is_post_same.write().unwrap() = false;
     }
 }
 
@@ -54,35 +54,28 @@ impl Query {
 
         let store = ctx.data_unchecked::<Arc<Store>>();
 
-        let is_same = {
-            // TODO: pick these ID's randomly to reduce the chance of false positives.
-            let are_posts_same = {
-                let cached_post = store.post.read().unwrap();
-                let post1_exists = cached_post
-                    .get(&posts[1].id.unwrap())
-                    .map(|post1| *post1 == posts[1])
-                    .unwrap_or(false);
-                let post2_exists = cached_post
-                    .get(&posts[2].id.unwrap())
-                    .map(|post2| post2 == &posts[2])
-                    .unwrap_or(false);
+        let are_posts_same = {
+            let cached_post = store.post.read().unwrap();
+            let post1_exists = cached_post
+                .get(&posts[1].id.unwrap())
+                .map(|post1| *post1 == posts[1])
+                .unwrap_or(false);
+            let post2_exists = cached_post
+                .get(&posts[2].id.unwrap())
+                .map(|post2| post2 == &posts[2])
+                .unwrap_or(false);
 
-                post1_exists && post2_exists
-            };
-
-            if are_posts_same {
-                true
-            } else {
-                store.reset();
-                let mut store_post_writer = store.post.write().unwrap();
-                store_post_writer.insert(posts[1].id.unwrap(), posts[1].clone());
-                store_post_writer.insert(posts[2].id.unwrap(), posts[2].clone());
-                false
-            }
+            post1_exists && post2_exists
         };
 
-        {
-            *store.is_post_same.write().unwrap() = is_same;
+        if are_posts_same {
+            *store.is_post_same.write().unwrap() = true;
+        } else {
+            // store.reset(); // expensive operation but it's required. TODO: don't clean up posts, directly replace them.
+            *store.is_post_same.write().unwrap() = false;
+            let mut store_post_writer = store.post.write().unwrap();
+            store_post_writer.insert(posts[1].id.unwrap(), posts[1].clone());
+            store_post_writer.insert(posts[2].id.unwrap(), posts[2].clone());
         }
 
         Ok(posts)
@@ -96,9 +89,12 @@ impl Query {
         let loader = ctx.data_unchecked::<DataLoader<PostLoader>>();
         let post = loader.load_one(id).await?;
         if let Some(actual_post) = post.as_ref() {
-            // cache the post early
-            // if post already exists in store, check if it's the same or not. if not same then clean up the store.
             let store = ctx.data_unchecked::<Arc<Store>>();
+            if let Some(cached_post) = store.post.write().unwrap().get(&id) {
+                if actual_post != cached_post {
+                    *store.is_post_same.write().unwrap() = false;
+                }
+            }
             store.post.write().unwrap().insert(id, actual_post.clone());
         }
         Ok(post)
@@ -125,7 +121,11 @@ impl Query {
         if let Some(actual_user) = &user {
             // cache the user early
             let store = ctx.data_unchecked::<Arc<Store>>();
-            // if user already exists in store, check if it's the same or not. if not same then clean up the store.
+            if let Some(cached_user) = store.users.write().unwrap().get(&id) {
+                if cached_user != actual_user {
+                    *store.is_post_same.write().unwrap() = false;
+                }
+            }
             store.users.write().unwrap().insert(id, actual_user.clone());
         }
 
@@ -154,21 +154,29 @@ impl Post {
         if *store.is_post_same.read().unwrap()
             && store.users.read().unwrap().contains_key(&self.user_id)
         {
-            let user = store.users.write().unwrap().get(&self.user_id).cloned();
+            let user = store.users.read().unwrap().get(&self.user_id).cloned();
             Ok(user)
         } else {
             let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
             let user = loader.load_one(self.user_id).await?;
             if let Some(actual_user) = user.as_ref() {
-                let mut user_store = store.users.write().unwrap();
-                user_store.insert(self.user_id, actual_user.clone());
+                if let Some(cached_user) = store.users.read().unwrap().get(&self.user_id) {
+                    if cached_user != actual_user {
+                        *store.is_post_same.write().unwrap() = false;
+                    }
+                }
+                store
+                    .users
+                    .write()
+                    .unwrap()
+                    .insert(self.user_id, actual_user.clone());
             }
             Ok(user)
         }
     }
 }
 
-#[derive(SimpleObject, Serialize, Deserialize, Debug, Clone)]
+#[derive(SimpleObject, Serialize, Deserialize, Debug, Clone, PartialEq)]
 struct User {
     id: Option<i32>,
     name: Option<String>,
@@ -179,13 +187,13 @@ struct User {
     website: Option<String>,
 }
 
-#[derive(SimpleObject, Serialize, Deserialize, Debug, Clone)]
+#[derive(SimpleObject, Serialize, Deserialize, Debug, Clone, PartialEq)]
 struct Address {
     zipcode: Option<String>,
     geo: Option<Geo>,
 }
 
-#[derive(SimpleObject, Serialize, Deserialize, Debug, Clone)]
+#[derive(SimpleObject, Serialize, Deserialize, Debug, Clone, PartialEq)]
 struct Geo {
     lat: Option<f64>,
     lng: Option<f64>,
@@ -275,6 +283,3 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     Ok(())
 }
-
-// 1. Connection Pooling.
-// 2. reset property of Mock Server.
