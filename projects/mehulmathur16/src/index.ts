@@ -9,7 +9,9 @@ const server = fastify({
 
 server.register(mercurius, {
     schema,
-    resolvers
+    resolvers,
+    allowBatchedQueries: true,
+    graphiql: true,
 })
 
 server.get('/ping', async (request, reply) => {
