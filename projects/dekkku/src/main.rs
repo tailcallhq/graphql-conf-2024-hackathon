@@ -19,15 +19,15 @@ const ALL_POSTS: &str = "http://localhost:3000/posts";
 struct Store {
     post: RwLock<HashMap<i32, Post>>,
     users: RwLock<HashMap<i32, User>>,
-    is_db_same: RwLock<bool>, // rename to is_dirty.
+    is_dirty: RwLock<bool>,
 }
 
 impl Default for Store {
     fn default() -> Self {
         Self {
-            post: RwLock::new(HashMap::default()),
-            users: RwLock::new(HashMap::default()),
-            is_db_same: RwLock::new(false),
+            post: RwLock::new(HashMap::new()),
+            users: RwLock::new(HashMap::new()),
+            is_dirty: RwLock::new(false),
         }
     }
 }
@@ -36,78 +36,54 @@ struct Query;
 
 #[Object]
 impl Query {
-    async fn posts(
-        &self,
-        ctx: &Context<'_>,
-    ) -> std::result::Result<Vec<Post>, async_graphql::Error> {
+    async fn posts(&self, ctx: &Context<'_>) -> std::result::Result<Vec<Post>, async_graphql::Error> {
         let client = ctx.data_unchecked::<Arc<Client>>();
-
         let response = client.get(ALL_POSTS).send().await?;
         let posts: Vec<Post> = response.json().await?;
-
         let store = ctx.data_unchecked::<Arc<Store>>();
 
         let are_posts_same = {
-            // TODO: pick ID's
-            let is_cache_empty = { store.post.read().unwrap().is_empty() };
-
+            let is_cache_empty = store.post.read().unwrap().is_empty();
             if is_cache_empty {
-                // Pick any two random posts from posts
                 let mut rng = rand::thread_rng();
                 let selected_posts: Vec<&Post> = posts.choose_multiple(&mut rng, 2).collect();
                 if selected_posts.len() == 2 {
-                    let post1 = selected_posts[0];
-                    let post2 = selected_posts[1];
                     let mut posts_writer = store.post.write().unwrap();
-                    posts_writer.insert(post1.id.unwrap(), post1.clone());
-                    posts_writer.insert(post2.id.unwrap(), post2.clone());
+                    for post in selected_posts {
+                        posts_writer.insert(post.id.unwrap(), post.clone());
+                    }
                 }
                 false
             } else {
-                // We've the posts, now check the posts from cache with the posts.
-                let mut are_posts_same = true;
-                let cached_posts = {
-                    store
-                        .post
-                        .write()
-                        .unwrap()
-                        .values()
-                        .cloned()
-                        .collect::<Vec<_>>()
-                };
+                let cached_posts: Vec<Post> = store.post.read().unwrap().values().cloned().collect();
                 let mut posts_writer = store.post.write().unwrap();
-                for post in cached_posts {
+                cached_posts.iter().all(|post| {
                     if let Some(new_post) = posts.iter().find(|p| p.id == post.id) {
-                        if post != *new_post {
-                            are_posts_same = false;
+                        if post != new_post {
                             posts_writer.insert(new_post.id.unwrap(), new_post.clone());
+                            false
+                        } else {
+                            true
                         }
                     } else {
-                        are_posts_same = false;
-                        break;
+                        false
                     }
-                }
-                are_posts_same
+                })
             }
         };
 
-        *store.is_db_same.write().unwrap() = are_posts_same;
-
+        *store.is_dirty.write().unwrap() = !are_posts_same;
         Ok(posts)
     }
 
-    async fn post(
-        &self,
-        ctx: &Context<'_>,
-        id: i32,
-    ) -> std::result::Result<Option<Post>, async_graphql::Error> {
+    async fn post(&self, ctx: &Context<'_>, id: i32) -> std::result::Result<Option<Post>, async_graphql::Error> {
         let loader = ctx.data_unchecked::<DataLoader<PostLoader>>();
         let post = loader.load_one(id).await?;
         if let Some(actual_post) = post.as_ref() {
             let store = ctx.data_unchecked::<Arc<Store>>();
-            if let Some(cached_post) = store.post.write().unwrap().get(&id) {
+            if let Some(cached_post) = store.post.read().unwrap().get(&id) {
                 if actual_post != cached_post {
-                    *store.is_db_same.write().unwrap() = false;
+                    *store.is_dirty.write().unwrap() = true;
                 }
             }
             store.post.write().unwrap().insert(id, actual_post.clone());
@@ -115,10 +91,7 @@ impl Query {
         Ok(post)
     }
 
-    async fn users(
-        &self,
-        ctx: &Context<'_>,
-    ) -> std::result::Result<Vec<User>, async_graphql::Error> {
+    async fn users(&self, ctx: &Context<'_>) -> std::result::Result<Vec<User>, async_graphql::Error> {
         let client = ctx.data_unchecked::<Arc<Client>>();
         let response = client.get(ALL_USERS).send().await?;
         let users: Vec<User> = response.json().await?;
@@ -128,51 +101,35 @@ impl Query {
         let selected_users: Vec<&User> = users.choose_multiple(&mut rng, 2).collect();
 
         if selected_users.len() == 2 {
-            let user1 = selected_users[0];
-            let user2 = selected_users[1];
-
             let users_writer = store.users.read().unwrap();
-            let mut are_users_same = true;
-
-            for user in [user1, user2] {
+            let are_users_same = selected_users.iter().all(|user| {
                 if let Some(id) = user.id {
-                    if let Some(cached_user) = users_writer.get(&id) {
-                        if cached_user != user {
-                            are_users_same = false;
-                        }
-                    } else {
-                        are_users_same = false;
-                    }
+                    users_writer.get(&id).map_or(false, |cached_user| cached_user == *user)
+                } else {
+                    false
                 }
-            }
+            });
 
             if !are_users_same {
-                *store.is_db_same.write().unwrap() = false;
+                *store.is_dirty.write().unwrap() = true;
             }
         }
 
         Ok(users)
     }
 
-    async fn user(
-        &self,
-        ctx: &Context<'_>,
-        id: i32,
-    ) -> std::result::Result<Option<User>, async_graphql::Error> {
+    async fn user(&self, ctx: &Context<'_>, id: i32) -> std::result::Result<Option<User>, async_graphql::Error> {
         let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
         let user = loader.load_one(id).await?;
-
         if let Some(actual_user) = &user {
-            // cache the user early
             let store = ctx.data_unchecked::<Arc<Store>>();
-            if let Some(cached_user) = store.users.write().unwrap().get(&id) {
+            if let Some(cached_user) = store.users.read().unwrap().get(&id) {
                 if cached_user != actual_user {
-                    *store.is_db_same.write().unwrap() = false;
+                    *store.is_dirty.write().unwrap() = true;
                 }
             }
             store.users.write().unwrap().insert(id, actual_user.clone());
         }
-
         Ok(user)
     }
 }
@@ -195,7 +152,7 @@ impl Post {
         ctx: &Context<'_>,
     ) -> std::result::Result<Option<User>, async_graphql::Error> {
         let store = ctx.data_unchecked::<Arc<Store>>();
-        if *store.is_db_same.read().unwrap()
+        if !*store.is_dirty.read().unwrap()
             && store.users.read().unwrap().contains_key(&self.user_id)
         {
             let user = store.users.read().unwrap().get(&self.user_id).cloned();
@@ -203,10 +160,11 @@ impl Post {
         } else {
             let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
             let user = loader.load_one(self.user_id).await?;
+            
             if let Some(actual_user) = user.as_ref() {
                 if let Some(cached_user) = store.users.read().unwrap().get(&self.user_id) {
                     if cached_user != actual_user {
-                        *store.is_db_same.write().unwrap() = false;
+                        *store.is_dirty.write().unwrap() = true;
                     }
                 }
                 store
