@@ -1,9 +1,10 @@
 name: Benchmark PR
 
 on:
-  push:
-    paths:
-      - "projects/**"
+  pull_request:
+    paths: ["projects/**"]
+    types: [opened, reopened, synchronize, labeled]
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
