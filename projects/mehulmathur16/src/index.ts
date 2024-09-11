@@ -27,14 +27,18 @@ server.register(mercurius, {
         })
 
         const postDataLoader = new DataLoader(async function (ids: any) {
-            const response = await axiosInstance.get('/posts');
-            const posts = response.data;
-            let obj = {} as any
+            const posts = await Promise.all(
+                ids.map(async (id: any) => {
+                    try {
+                        const response = await axiosInstance.get(`/posts/${id}`);
+                        return response.data;
+                    } catch (error: any) {
+                        return new Error(`Failed to fetch post with id ${id}: ${error.message}`);
+                    }
+                })
+            );
 
-            posts.map((post: any) => {
-                obj[post.id] = post;
-            })
-            return ids.map((id: any) => obj[id]);
+            return posts;
         })
 
         return {
