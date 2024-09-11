@@ -3,6 +3,7 @@ use async_graphql::http::GraphiQLSource;
 use async_graphql::*;
 use async_graphql_poem::*;
 use poem::{listener::TcpListener, web::Html, *};
+use rand::seq::SliceRandom;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -18,7 +19,7 @@ const ALL_POSTS: &str = "http://localhost:3000/posts";
 struct Store {
     post: RwLock<HashMap<i32, Post>>,
     users: RwLock<HashMap<i32, User>>,
-    is_post_same: RwLock<bool>, // rename to is_dirty.
+    is_db_same: RwLock<bool>, // rename to is_dirty.
 }
 
 impl Default for Store {
@@ -26,7 +27,7 @@ impl Default for Store {
         Self {
             post: RwLock::new(HashMap::default()),
             users: RwLock::new(HashMap::default()),
-            is_post_same: RwLock::new(false),
+            is_db_same: RwLock::new(false),
         }
     }
 }
@@ -47,28 +48,50 @@ impl Query {
         let store = ctx.data_unchecked::<Arc<Store>>();
 
         let are_posts_same = {
-            let cached_post = store.post.read().unwrap();
-            let post1_exists = cached_post
-                .get(&posts[1].id.unwrap())
-                .map(|post1| *post1 == posts[1])
-                .unwrap_or(false);
-            let post2_exists = cached_post
-                .get(&posts[2].id.unwrap())
-                .map(|post2| post2 == &posts[2])
-                .unwrap_or(false);
+            // TODO: pick ID's
+            let is_cache_empty = { store.post.read().unwrap().is_empty() };
 
-            post1_exists && post2_exists
+            if is_cache_empty {
+                // Pick any two random posts from posts
+                let mut rng = rand::thread_rng();
+                let selected_posts: Vec<&Post> = posts.choose_multiple(&mut rng, 2).collect();
+                if selected_posts.len() == 2 {
+                    let post1 = selected_posts[0];
+                    let post2 = selected_posts[1];
+                    let mut posts_writer = store.post.write().unwrap();
+                    posts_writer.insert(post1.id.unwrap(), post1.clone());
+                    posts_writer.insert(post2.id.unwrap(), post2.clone());
+                }
+                false
+            } else {
+                // We've the posts, now check the posts from cache with the posts.
+                let mut are_posts_same = true;
+                let cached_posts = {
+                    store
+                        .post
+                        .write()
+                        .unwrap()
+                        .values()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                };
+                let mut posts_writer = store.post.write().unwrap();
+                for post in cached_posts {
+                    if let Some(new_post) = posts.iter().find(|p| p.id == post.id) {
+                        if post != *new_post {
+                            are_posts_same = false;
+                            posts_writer.insert(new_post.id.unwrap(), new_post.clone());
+                        }
+                    } else {
+                        are_posts_same = false;
+                        break;
+                    }
+                }
+                are_posts_same
+            }
         };
 
-        if are_posts_same {
-            *store.is_post_same.write().unwrap() = true;
-        } else {
-            // store.reset(); // expensive operation but it's required. TODO: don't clean up posts, directly replace them.
-            *store.is_post_same.write().unwrap() = false;
-            let mut store_post_writer = store.post.write().unwrap();
-            store_post_writer.insert(posts[1].id.unwrap(), posts[1].clone());
-            store_post_writer.insert(posts[2].id.unwrap(), posts[2].clone());
-        }
+        *store.is_db_same.write().unwrap() = are_posts_same;
 
         Ok(posts)
     }
@@ -84,7 +107,7 @@ impl Query {
             let store = ctx.data_unchecked::<Arc<Store>>();
             if let Some(cached_post) = store.post.write().unwrap().get(&id) {
                 if actual_post != cached_post {
-                    *store.is_post_same.write().unwrap() = false;
+                    *store.is_db_same.write().unwrap() = false;
                 }
             }
             store.post.write().unwrap().insert(id, actual_post.clone());
@@ -99,6 +122,35 @@ impl Query {
         let client = ctx.data_unchecked::<Arc<Client>>();
         let response = client.get(ALL_USERS).send().await?;
         let users: Vec<User> = response.json().await?;
+
+        let store = ctx.data_unchecked::<Arc<Store>>();
+        let mut rng = rand::thread_rng();
+        let selected_users: Vec<&User> = users.choose_multiple(&mut rng, 2).collect();
+
+        if selected_users.len() == 2 {
+            let user1 = selected_users[0];
+            let user2 = selected_users[1];
+
+            let users_writer = store.users.read().unwrap();
+            let mut are_users_same = true;
+
+            for user in [user1, user2] {
+                if let Some(id) = user.id {
+                    if let Some(cached_user) = users_writer.get(&id) {
+                        if cached_user != user {
+                            are_users_same = false;
+                        }
+                    } else {
+                        are_users_same = false;
+                    }
+                }
+            }
+
+            if !are_users_same {
+                *store.is_db_same.write().unwrap() = false;
+            }
+        }
+
         Ok(users)
     }
 
@@ -115,7 +167,7 @@ impl Query {
             let store = ctx.data_unchecked::<Arc<Store>>();
             if let Some(cached_user) = store.users.write().unwrap().get(&id) {
                 if cached_user != actual_user {
-                    *store.is_post_same.write().unwrap() = false;
+                    *store.is_db_same.write().unwrap() = false;
                 }
             }
             store.users.write().unwrap().insert(id, actual_user.clone());
@@ -143,7 +195,7 @@ impl Post {
         ctx: &Context<'_>,
     ) -> std::result::Result<Option<User>, async_graphql::Error> {
         let store = ctx.data_unchecked::<Arc<Store>>();
-        if *store.is_post_same.read().unwrap()
+        if *store.is_db_same.read().unwrap()
             && store.users.read().unwrap().contains_key(&self.user_id)
         {
             let user = store.users.read().unwrap().get(&self.user_id).cloned();
@@ -154,7 +206,7 @@ impl Post {
             if let Some(actual_user) = user.as_ref() {
                 if let Some(cached_user) = store.users.read().unwrap().get(&self.user_id) {
                     if cached_user != actual_user {
-                        *store.is_post_same.write().unwrap() = false;
+                        *store.is_db_same.write().unwrap() = false;
                     }
                 }
                 store
