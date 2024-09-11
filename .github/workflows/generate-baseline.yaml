@@ -3,6 +3,8 @@ name: Generate Baseline
 on:
   workflow_dispatch:
 
+permissions: write-all
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -30,7 +32,7 @@ jobs:
       run: cargo run --bin generate-baseline
 
     - name: Commit & Push changes
-      uses: actions-js/push@v1
+      uses: actions-js/push@v1.5
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         directory: "reference/results"
