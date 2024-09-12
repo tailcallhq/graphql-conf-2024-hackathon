@@ -11,6 +11,7 @@ command-group = { version = "5.0.1", features = ["with-tokio"] }
 diff_logger = "0.1.0"
 easy_retry = { version = "0.1.0", features = ["async"] }
 mock_json = "0.1.8"
+octocrate = { version = "2.0.1", features = ["issues", "pulls"] }
 regex = "1.10.6"
 reqwest = { version = "0.12.7", features = ["json"] }
 serde = "1.0.210"
