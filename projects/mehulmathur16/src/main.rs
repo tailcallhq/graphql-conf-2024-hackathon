@@ -6,7 +6,6 @@ use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse};
 use reqwest::Client;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 
 #[derive(Deserialize, Clone)]
 struct Post {
@@ -42,7 +41,6 @@ struct Geo {
 
 struct UserLoader {
     client: Client,
-    cache: Arc<RwLock<HashMap<i32, User>>>,
 }
 
 #[async_trait::async_trait]
@@ -66,21 +64,8 @@ impl Loader<i32> for UserLoader {
             .await?;
 
         let mut user_map = HashMap::new();
-        {
-            let cache = self.cache.read().unwrap();
-            for user in &response {
-                if cache.contains_key(&user.id) {
-                    user_map.insert(user.id, user.clone());
-                }
-            }
-        }
-
-        {
-            let mut cache = self.cache.write().unwrap();
-            for user in response {
-                user_map.insert(user.id, user.clone());
-                cache.insert(user.id, user);
-            }
+        for user in response {
+            user_map.insert(user.id, user);
         }
         Ok(user_map)
     }
@@ -113,6 +98,8 @@ impl Loader<i32> for PostsLoader {
                 }
             }
         });
+
+        let futures: Vec<_> = futures.collect();
 
         let results = futures::future::join_all(futures).await;
 
@@ -162,11 +149,14 @@ impl QueryRoot {
     }
 
     async fn user(&self, ctx: &Context<'_>, id: i32) -> async_graphql::Result<User> {
-        let loader = ctx.data::<DataLoader<UserLoader>>().unwrap();
-        loader
-            .load_one(id)
+        let client = ctx.data::<Client>().unwrap();
+        let response = client
+            .get(&format!("http://localhost:3000/users/{}", id))
+            .send()
             .await?
-            .ok_or_else(|| async_graphql::Error::new("User not found"))
+            .json::<User>()
+            .await?;
+        Ok(response)
     }
 }
 
@@ -199,7 +189,6 @@ async fn main() -> std::io::Result<()> {
     let user_loader = DataLoader::new(
         UserLoader {
             client: client.clone(),
-            cache: Arc::new(RwLock::new(HashMap::new())),
         },
         tokio::spawn,
     );
