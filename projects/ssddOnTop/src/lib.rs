@@ -1,3 +1,4 @@
+#![allow(unused, non_snake_case)]
 mod app_ctx;
 mod blueprint;
 mod cache;
