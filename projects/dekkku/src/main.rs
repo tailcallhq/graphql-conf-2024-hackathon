@@ -49,44 +49,44 @@ impl Query {
         let mut posts: Vec<Post> = http_client.request(ALL_POSTS).await?;
         let store = ctx.data_unchecked::<Arc<Store>>();
 
-        // TODO: clean this up.
-        let are_posts_same = {
-            let is_cache_empty = store.posts.read().unwrap().is_empty();
-            if is_cache_empty {
-                let mut rng = rand::thread_rng();
-                let selected_posts: Vec<&Post> = posts.choose_multiple(&mut rng, 2).collect();
-                if selected_posts.len() == 2 {
-                    let mut posts_writer = store.posts.write().unwrap();
-                    for post in selected_posts {
-                        posts_writer.insert(post.id, post.clone());
-                    }
-                }
-                false
-            } else {
-                let cached_posts: Vec<Post> =
-                    store.posts.read().unwrap().values().cloned().collect();
-                let mut posts_writer = store.posts.write().unwrap();
-                cached_posts.iter().all(|post| {
-                    if let Some(new_post) = posts.iter().find(|p| p.id == post.id) {
-                        if post != new_post {
-                            posts_writer.insert(new_post.id, new_post.clone());
-                            false
-                        } else {
-                            true
-                        }
-                    } else {
-                        false
-                    }
-                })
-            }
-        };
-
         let should_query_user = ctx
             .field()
             .selection_set()
             .any(|field| field.name() == "user");
 
         if should_query_user {
+            // TODO: clean this up.
+            let are_posts_same = {
+                let is_cache_empty = store.posts.read().unwrap().is_empty();
+                if is_cache_empty {
+                    let mut rng = rand::thread_rng();
+                    let selected_posts: Vec<&Post> = posts.choose_multiple(&mut rng, 2).collect();
+                    if selected_posts.len() == 2 {
+                        let mut posts_writer = store.posts.write().unwrap();
+                        for post in selected_posts {
+                            posts_writer.insert(post.id, post.clone());
+                        }
+                    }
+                    false
+                } else {
+                    let cached_posts: Vec<Post> =
+                        store.posts.read().unwrap().values().cloned().collect();
+                    let mut posts_writer = store.posts.write().unwrap();
+                    cached_posts.iter().all(|post| {
+                        if let Some(new_post) = posts.iter().find(|p| p.id == post.id) {
+                            if post != new_post {
+                                posts_writer.insert(new_post.id, new_post.clone());
+                                false
+                            } else {
+                                true
+                            }
+                        } else {
+                            false
+                        }
+                    })
+                }
+            };
+
             if are_posts_same {
                 // Posts are the same, load the data from store and update the posts' user property.
                 let store_users = store.users.read().unwrap();
