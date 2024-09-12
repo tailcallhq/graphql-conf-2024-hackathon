@@ -1,34 +1,26 @@
-use std::ops::Deref;
-use crate::blueprint::{Blueprint, FieldHash};
-use crate::http::request::Request;
-use bytes::Bytes;
-use http_body_util::Full;
-use std::sync::Arc;
 use crate::app_ctx::AppCtx;
 use crate::blueprint::model::{FieldName, TypeName};
+use crate::blueprint::{Blueprint, FieldHash};
 use crate::http::method::Method;
+use crate::http::request::Request;
 use crate::ir::eval_ctx::EvalContext;
 use crate::request_context::RequestContext;
 use crate::value::Value;
+use bytes::Bytes;
+use http_body_util::Full;
+use std::ops::Deref;
+use std::sync::Arc;
 
 pub async fn handle_request(
     req: Request,
     app_ctx: AppCtx,
 ) -> anyhow::Result<hyper::Response<Full<Bytes>>> {
     let resp = match req.method {
-        Method::GET => {
-            hyper::Response::new(Full::new(Bytes::from_static(
-                b"Hello, World!",
-            )))
-        }
-        Method::POST => {
-            handle_gql_req(req, app_ctx).await?
-        }
-        _ => {
-            hyper::Response::builder()
-                .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
-                .body(Full::new(Bytes::from_static(b"Method Not Allowed")))?
-        }
+        Method::GET => hyper::Response::new(Full::new(Bytes::from_static(b"Hello, World!"))),
+        Method::POST => handle_gql_req(req, app_ctx).await?,
+        _ => hyper::Response::builder()
+            .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
+            .body(Full::new(Bytes::from_static(b"Method Not Allowed")))?,
     };
     Ok(resp)
 }
@@ -36,7 +28,6 @@ pub async fn handle_request(
 fn create_request_context(app_ctx: &AppCtx) -> RequestContext {
     RequestContext::from(app_ctx)
 }
-
 
 async fn handle_gql_req(
     request: Request,
@@ -68,16 +59,12 @@ async fn handle_gql_req(
                 println!("hx1: {}", field.name.as_ref());
             }
         }*/
-        Ok(
-            hyper::Response::new(Full::new(Bytes::from_static(
-                b"Printed",
-            )))
-        )
+        Ok(hyper::Response::new(Full::new(Bytes::from_static(
+            b"Printed",
+        ))))
     } else {
-        Ok(
-            hyper::Response::new(Full::new(Bytes::from_static(
-                b"Only queries are suppored",
-            )))
-        )
+        Ok(hyper::Response::new(Full::new(Bytes::from_static(
+            b"Only queries are suppored",
+        ))))
     }
 }

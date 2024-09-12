@@ -20,25 +20,28 @@ fn get_attrs(attrs: &[syn::Attribute]) -> syn::Result<Attrs> {
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident(MERGE_RIGHT_FN) {
                     let p: syn::Expr = meta.value()?.parse()?;
-                    let lit =
-                        if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(lit), .. }) = p {
-                            let suffix = lit.suffix();
-                            if !suffix.is_empty() {
-                                return Err(syn::Error::new(
-                                    lit.span(),
-                                    format!("unexpected suffix `{}` on string literal", suffix),
-                                ));
-                            }
-                            lit
-                        } else {
+                    let lit = if let syn::Expr::Lit(syn::ExprLit {
+                        lit: syn::Lit::Str(lit),
+                        ..
+                    }) = p
+                    {
+                        let suffix = lit.suffix();
+                        if !suffix.is_empty() {
                             return Err(syn::Error::new(
-                                p.span(),
-                                format!(
-                                    "expected merge_right {} attribute to be a string.",
-                                    MERGE_RIGHT_FN
-                                ),
+                                lit.span(),
+                                format!("unexpected suffix `{}` on string literal", suffix),
                             ));
-                        };
+                        }
+                        lit
+                    } else {
+                        return Err(syn::Error::new(
+                            p.span(),
+                            format!(
+                                "expected merge_right {} attribute to be a string.",
+                                MERGE_RIGHT_FN
+                            ),
+                        ));
+                    };
                     let expr_path: syn::ExprPath = lit.parse()?;
                     attrs_ret.merge_right_fn = Some(expr_path);
                     Ok(())

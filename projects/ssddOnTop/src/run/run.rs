@@ -1,9 +1,9 @@
-use std::sync::Arc;
 use crate::app_ctx::AppCtx;
 use crate::blueprint::Blueprint;
 use crate::config::ConfigReader;
 use crate::run;
 use crate::target_runtime::TargetRuntime;
+use std::sync::Arc;
 
 pub async fn run() -> anyhow::Result<()> {
     let config_reader = ConfigReader::init();

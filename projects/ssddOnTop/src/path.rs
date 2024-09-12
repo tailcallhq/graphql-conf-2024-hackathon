@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
-use serde_json::json;
 use crate::ir::eval_ctx::EvalContext;
 use crate::json::JsonLike;
 use crate::value::Value;
+use serde_json::json;
 
 ///
 /// The path module provides a trait for accessing values from a JSON-like
@@ -53,7 +53,7 @@ fn convert_value(value: Cow<'_, Value>) -> Option<Cow<'_, str>> {
                 serde_json::Value::Array(list) => Some(json!(list).to_string().into()),
                 _ => None,
             }
-        },
+        }
         Cow::Borrowed(val) => {
             let val = val.serde();
             match val {
@@ -64,7 +64,7 @@ fn convert_value(value: Cow<'_, Value>) -> Option<Cow<'_, str>> {
                 serde_json::Value::Array(list) => Some(json!(list).to_string().into()),
                 _ => None,
             }
-        },
+        }
         _ => None,
     }
 }
@@ -91,13 +91,13 @@ impl<'a> EvalContext<'a> {
             return match path[0].as_ref() {
                 "value" => Some(ValueString::Value(ctx.path_value(&[] as &[T])?)),
                 "args" => Some(ValueString::Value(ctx.path_arg::<&str>(&[])?)),
-               /* "vars" => Some(ValueString::String(Cow::Owned(
+                /* "vars" => Some(ValueString::String(Cow::Owned(
                     json!(ctx.vars()).to_string(),
                 ))),*/
                 _ => {
                     println!("none");
                     None
-                },
+                }
             };
         }
 
@@ -105,7 +105,7 @@ impl<'a> EvalContext<'a> {
             .and_then(move |(head, tail)| match head.as_ref() {
                 "value" => Some(ValueString::Value(ctx.path_value(tail)?)),
                 "args" => Some(ValueString::Value(ctx.path_arg(tail)?)),
-           /*     "headers" => Some(ValueString::String(Cow::Borrowed(
+                /*     "headers" => Some(ValueString::String(Cow::Borrowed(
                     ctx.header(tail[0].as_ref())?,
                 ))),
                 "vars" => Some(ValueString::String(Cow::Borrowed(
@@ -115,7 +115,7 @@ impl<'a> EvalContext<'a> {
                 _ => {
                     println!("none1");
                     None
-                },
+                }
             })
     }
 }
@@ -129,9 +129,7 @@ impl<'a> PathValue for EvalContext<'a> {
 impl<'a> PathString for EvalContext<'a> {
     fn path_string<T: AsRef<str>>(&self, path: &[T]) -> Option<Cow<'_, str>> {
         self.to_raw_value(path).and_then(|value| match value {
-            ValueString::String(env) => {
-                Some(env)
-            },
+            ValueString::String(env) => Some(env),
             ValueString::Value(value) => convert_value(value),
         })
     }

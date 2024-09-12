@@ -1,3 +1,4 @@
+use crate::app_ctx::AppCtx;
 use crate::blueprint::{Blueprint, Server};
 use crate::http::request_handler::handle_request;
 use hyper::service::service_fn;
@@ -5,7 +6,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
-use crate::app_ctx::AppCtx;
 
 pub async fn start(app_ctx: AppCtx) -> anyhow::Result<()> {
     let addr = app_ctx.blueprint.server.addr();

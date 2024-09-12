@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex, Weak};
 
+use crate::ir::IoId;
 use futures_util::Future;
 use tokio::sync::broadcast;
-use crate::ir::IoId;
 
 pub trait Key: Send + Sync + Eq + Hash + Clone {}
 impl<A: Send + Sync + Eq + Hash + Clone> Key for A {}
@@ -49,7 +49,11 @@ enum Step<Value> {
 
 impl<K: Key, V: Value> Dedupe<K, V> {
     pub fn new(size: usize, persist: bool) -> Self {
-        Self { cache: Arc::new(Mutex::new(HashMap::new())), size, persist }
+        Self {
+            cache: Arc::new(Mutex::new(HashMap::new())),
+            size,
+            persist,
+        }
     }
 
     pub async fn dedupe<'a, Fn, Fut>(&'a self, key: &'a K, or_else: Fn) -> V
@@ -300,7 +304,10 @@ mod tests {
             call_2: bool,
         }
 
-        let status = Arc::new(Mutex::new(Status { call_1: false, call_2: false }));
+        let status = Arc::new(Mutex::new(Status {
+            call_1: false,
+            call_2: false,
+        }));
 
         let cache = Arc::new(Dedupe::<u64, ()>::new(100, true));
         let cache_1 = cache.clone();
@@ -341,7 +348,13 @@ mod tests {
 
         // Task 1 should still have completed because others are dependent on it.
         let actual = status.lock().unwrap().deref().to_owned();
-        assert_eq!(actual, Status { call_1: true, call_2: false })
+        assert_eq!(
+            actual,
+            Status {
+                call_1: true,
+                call_2: false
+            }
+        )
     }
 
     #[tokio::test]
@@ -355,7 +368,10 @@ mod tests {
             call_2: bool,
         }
 
-        let status = Arc::new(Mutex::new(Status { call_1: false, call_2: false }));
+        let status = Arc::new(Mutex::new(Status {
+            call_1: false,
+            call_2: false,
+        }));
 
         let cache = Arc::new(Dedupe::<u64, ()>::new(100, true));
         let cache_1 = cache.clone();
@@ -394,6 +410,12 @@ mod tests {
 
         // No task should have completed
         let actual = status.lock().unwrap().deref().to_owned();
-        assert_eq!(actual, Status { call_1: false, call_2: false })
+        assert_eq!(
+            actual,
+            Status {
+                call_1: false,
+                call_2: false
+            }
+        )
     }
 }

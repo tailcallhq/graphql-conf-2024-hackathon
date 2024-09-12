@@ -26,7 +26,9 @@ impl Default for ServiceDocumentBuilder {
 
 impl ServiceDocumentBuilder {
     pub fn new() -> Self {
-        Self { definitions: vec![] }
+        Self {
+            definitions: vec![],
+        }
     }
 
     pub fn add_directive(
@@ -48,6 +50,8 @@ impl ServiceDocumentBuilder {
     }
 
     pub fn build(self) -> ServiceDocument {
-        ServiceDocument { definitions: self.definitions }
+        ServiceDocument {
+            definitions: self.definitions,
+        }
     }
 }

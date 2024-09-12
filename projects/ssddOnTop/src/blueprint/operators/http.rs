@@ -41,13 +41,9 @@ fn compile_http(config_module: &config::Config, http: &config::Http) -> anyhow::
     )?;
 
     let ir = if http.method == Method::GET {
-        IR::IO(IO::Http {
-            req_template,
-        })
+        IR::IO(IO::Http { req_template })
     } else {
-        IR::IO(IO::Http {
-            req_template,
-        })
+        IR::IO(IO::Http { req_template })
     };
 
     Ok(ir)

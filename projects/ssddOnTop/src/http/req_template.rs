@@ -5,12 +5,12 @@ use crate::ir::eval_ctx::EvalContext;
 use crate::ir::IoId;
 use crate::mustache::model::{Mustache, Segment};
 use crate::path::{PathString, PathValue, ValueString};
+use crate::value::Value;
 use hyper::Method;
 use reqwest::header::HeaderValue;
 use std::borrow::Cow;
 use std::hash::{Hash, Hasher};
 use url::Url;
-use crate::value::Value;
 
 #[derive(Debug, Clone)]
 pub struct RequestTemplate {
@@ -67,7 +67,7 @@ impl RequestTemplate {
 
         self.method.hash(state);
 
-       /* for (name, value) in ctx.headers().iter() {
+        /* for (name, value) in ctx.headers().iter() {
             name.hash(state);
             value.hash(state);
         }*/
@@ -92,9 +92,9 @@ impl<'a, A: PathValue> ValueStringEval<A> {
             .segments()
             .iter()
             .filter_map(|segment| match segment {
-                Segment::Literal(text) => Some(ValueString::Value(Cow::Owned(
-                   Value::new(serde_json::Value::String(text.to_owned())),
-                ))),
+                Segment::Literal(text) => Some(ValueString::Value(Cow::Owned(Value::new(
+                    serde_json::Value::String(text.to_owned()),
+                )))),
                 Segment::Expression(parts) => in_value.raw_value(parts),
             })
             .next() // Return the first value that is found
@@ -153,8 +153,7 @@ impl RequestTemplate {
     /// Checks if the template has any mustache templates or not
     /// Returns true if there are not templates
     pub fn is_const(&self) -> bool {
-        self.root_url.is_const()
-            && self.query.iter().all(|query| query.value.is_const())
+        self.root_url.is_const() && self.query.iter().all(|query| query.value.is_const())
     }
 
     /// Creates a Request for the given context
@@ -165,14 +164,17 @@ impl RequestTemplate {
         // Create url
         let url = self.create_url(ctx)?;
         let method = self.method.clone();
-        let req = reqwest::Request::new(crate::http::method::Method::from(method).into_reqwest(), url);
+        let req = reqwest::Request::new(
+            crate::http::method::Method::from(method).into_reqwest(),
+            url,
+        );
         // req = self.set_headers(req, ctx);
         // req = self.set_body(req, ctx)?;
 
         Ok(req)
     }
 
-/*    /// Sets the headers for the request
+    /*    /// Sets the headers for the request
     fn set_headers<C: PathString>(
         &self,
         mut req: reqwest::Request,
@@ -206,5 +208,4 @@ impl RequestTemplate {
             query_encoder: Default::default(),
         })
     }
-
 }

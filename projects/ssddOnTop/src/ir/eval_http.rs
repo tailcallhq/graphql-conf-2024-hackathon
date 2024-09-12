@@ -1,15 +1,14 @@
-use bytes::Bytes;
-use reqwest::Request;
-use crate::http::RequestTemplate;
 use crate::http::response::Response;
+use crate::http::RequestTemplate;
 use crate::ir::eval_ctx::EvalContext;
 use crate::value::Value;
+use bytes::Bytes;
+use reqwest::Request;
 
 pub struct EvalHttp<'a, 'ctx> {
     evaluation_ctx: &'ctx EvalContext<'a>,
     request_template: &'a RequestTemplate,
 }
-
 
 impl<'a, 'ctx> EvalHttp<'a, 'ctx> {
     pub fn new(

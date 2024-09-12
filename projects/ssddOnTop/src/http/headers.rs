@@ -28,7 +28,10 @@ impl From<reqwest::header::HeaderMap> for HeaderMap {
     fn from(value: reqwest::header::HeaderMap) -> Self {
         let mut map = hyper::header::HeaderMap::new();
         for (k, v) in value.iter() {
-            map.insert(hyper::header::HeaderName::from_str(k.as_str()).unwrap(),hyper::header::HeaderValue::from_str(v.to_str().unwrap()).unwrap());
+            map.insert(
+                hyper::header::HeaderName::from_str(k.as_str()).unwrap(),
+                hyper::header::HeaderValue::from_str(v.to_str().unwrap()).unwrap(),
+            );
         }
         Self(map)
     }

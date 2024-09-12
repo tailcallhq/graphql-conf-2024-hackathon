@@ -129,13 +129,19 @@ fn determine_type_from_schema(name: String, schema: &SchemaObject) -> Type {
         return determine_type_from_reference(reference);
     }
 
-    Type { nullable: true, base: BaseType::Named(Name::new("JSON")) }
+    Type {
+        nullable: true,
+        base: BaseType::Named(Name::new("JSON")),
+    }
 }
 
 fn determine_type_from_reference(reference: &str) -> Type {
     let mut name = reference.split('/').last().unwrap().to_string();
     first_char_to_upper(&mut name);
-    Type { nullable: true, base: BaseType::Named(Name::new(name)) }
+    Type {
+        nullable: true,
+        base: BaseType::Named(Name::new(name)),
+    }
 }
 
 fn determine_type_from_arr_valid(name: String, array_valid: &ArrayValidation) -> Type {
@@ -157,15 +163,24 @@ fn determine_type_from_arr_valid(name: String, array_valid: &ArrayValidation) ->
             },
         }
     } else {
-        Type { nullable: true, base: BaseType::Named(Name::new("JSON")) }
+        Type {
+            nullable: true,
+            base: BaseType::Named(Name::new("JSON")),
+        }
     }
 }
 
 fn determine_type_from_object_valid(name: String, typ: &ObjectValidation) -> Type {
     if !typ.properties.is_empty() {
-        Type { nullable: true, base: BaseType::Named(Name::new(name)) }
+        Type {
+            nullable: true,
+            base: BaseType::Named(Name::new(name)),
+        }
     } else {
-        Type { nullable: true, base: BaseType::Named(Name::new("JSON")) }
+        Type {
+            nullable: true,
+            base: BaseType::Named(Name::new("JSON")),
+        }
     }
 }
 

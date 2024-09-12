@@ -1,4 +1,3 @@
-
 use async_graphql::{Pos, Positioned};
 use schemars::schema::SchemaObject;
 

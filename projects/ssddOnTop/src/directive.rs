@@ -1,9 +1,9 @@
+use crate::blueprint;
 use async_graphql::parser::types::ConstDirective;
 use async_graphql::{Name, Pos, Positioned};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use serde_path_to_error::deserialize;
-use crate::blueprint;
 
 fn pos<A>(a: A) -> Positioned<A> {
     Positioned::new(a, Pos::default())
@@ -14,12 +14,15 @@ fn to_const_directive(directive: &blueprint::Directive) -> anyhow::Result<ConstD
     let mut arguments = Vec::new();
     for (k, v) in directive.arguments.iter() {
         let name = pos(Name::new(k.clone()));
-        let x = serde_json::from_value(v.clone()).map(pos).map(|value| (name, value))?;
+        let x = serde_json::from_value(v.clone())
+            .map(pos)
+            .map(|value| (name, value))?;
         arguments.push(x);
     }
-    Ok(
-        ConstDirective { name: pos(Name::new(directive.name.clone())), arguments }
-    )
+    Ok(ConstDirective {
+        name: pos(Name::new(directive.name.clone())),
+        arguments,
+    })
 }
 
 pub trait DirectiveCodec: Sized {
@@ -67,7 +70,7 @@ impl<'a, A: Deserialize<'a> + Serialize + 'a> DirectiveCodec for A {
             map.insert(k, v);
         }
         Ok(deserialize(Value::Object(map))?)
-/*        Valid::from_iter(directive.arguments.iter(), |(k, v)| {
+        /*        Valid::from_iter(directive.arguments.iter(), |(k, v)| {
             Valid::from(serde_json::to_value(&v.node).map_err(|e| {
                 ValidationError::new(e.to_string())
                     .trace(format!("@{}", directive.name.node).as_str())
@@ -102,18 +105,21 @@ impl<'a, A: Deserialize<'a> + Serialize + 'a> DirectiveCodec for A {
             ));
         }
 
-        ConstDirective { name: pos(Name::new(name)), arguments }
+        ConstDirective {
+            name: pos(Name::new(name)),
+            arguments,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
 
+    use crate::blueprint::Directive;
+    use crate::directive::{pos, to_const_directive};
     use async_graphql::parser::types::ConstDirective;
     use async_graphql_value::Name;
     use pretty_assertions::assert_eq;
-    use crate::blueprint::Directive;
-    use crate::directive::{pos, to_const_directive};
 
     #[test]
     fn test_to_const_directive() {

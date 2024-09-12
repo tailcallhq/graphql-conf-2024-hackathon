@@ -1,23 +1,23 @@
+mod app_ctx;
 mod blueprint;
+mod cache;
 mod config;
 mod directive;
+mod dl;
 mod endpoint;
 mod from_doc;
 mod hasher;
 mod helpers;
 mod http;
 mod ir;
+mod jit;
 mod json;
 mod mustache;
 mod path;
-pub mod run;
-mod value;
-mod target_runtime;
-mod cache;
-mod app_ctx;
 mod request_context;
-mod jit;
-mod dl;
+pub mod run;
+mod target_runtime;
+mod value;
 
 pub fn is_default<T: Default + Eq>(val: &T) -> bool {
     *val == T::default()

@@ -1,5 +1,5 @@
-use std::fmt::{Display, Formatter};
 use derive_getters::Getters;
+use std::fmt::{Display, Formatter};
 
 #[derive(Getters, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Value {

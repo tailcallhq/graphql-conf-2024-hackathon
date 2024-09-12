@@ -1,10 +1,10 @@
-use std::num::NonZeroU64;
-use futures_util::FutureExt;
 use crate::ir::eval_ctx::EvalContext;
 use crate::ir::eval_http::EvalHttp;
 use crate::ir::IO;
 use crate::request_context::CacheErr;
 use crate::value::Value;
+use futures_util::FutureExt;
+use std::num::NonZeroU64;
 
 pub async fn eval_io(io: &IO, ctx: &mut EvalContext<'_>) -> anyhow::Result<Value> {
     let key = io.cache_key(ctx);
@@ -13,7 +13,10 @@ pub async fn eval_io(io: &IO, ctx: &mut EvalContext<'_>) -> anyhow::Result<Value
         Ok(val.clone())
     } else {
         let val = eval_io_inner(io, ctx).await?;
-        ctx.request_ctx.cache.set(key, val.clone(), NonZeroU64::MAX).await?;
+        ctx.request_ctx
+            .cache
+            .set(key, val.clone(), NonZeroU64::MAX)
+            .await?;
         Ok(val)
     }
 }

@@ -1,8 +1,8 @@
-use crate::target_runtime::http::NativeHttp;
-use std::sync::Arc;
 use crate::blueprint::Upstream;
 use crate::ir::IoId;
+use crate::target_runtime::http::NativeHttp;
 use crate::value::Value;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct TargetRuntime {
@@ -62,14 +62,14 @@ pub mod cache {
 }
 
 mod http {
-    use bytes::Bytes;
     use crate::blueprint::Upstream;
     use crate::cache::HttpCacheManager;
+    use crate::http::response::Response;
+    use anyhow::Result;
+    use bytes::Bytes;
     use http_cache_reqwest::{Cache, CacheMode, HttpCache, HttpCacheOptions};
     use reqwest::Client;
     use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-    use crate::http::response::Response;
-    use anyhow::Result;
 
     pub struct NativeHttp {
         client: ClientWithMiddleware,
@@ -91,11 +91,11 @@ mod http {
         }
         pub async fn execute(&self, mut request: reqwest::Request) -> Result<Response<Bytes>> {
             tracing::info!(
-            "{} {} {:?}",
-            request.method(),
-            request.url(),
-            request.version()
-        );
+                "{} {} {:?}",
+                request.method(),
+                request.url(),
+                request.version()
+            );
             tracing::debug!("request: {:?}", request);
             let response = self.client.execute(request).await;
             tracing::debug!("response: {:?}", response);
@@ -105,7 +105,7 @@ mod http {
                     .error_for_status()
                     .map_err(|err| err.without_url())?,
             )
-                .await?)
+            .await?)
         }
     }
 }

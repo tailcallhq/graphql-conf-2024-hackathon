@@ -1,12 +1,11 @@
 use http_cache_reqwest::{CacheManager, HttpResponse};
 use http_cache_semantics::CachePolicy;
-use serde::{Deserialize, Serialize};
 use moka::future::Cache;
 use moka::policy::EvictionPolicy;
+use serde::{Deserialize, Serialize};
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, BoxError>;
 use std::sync::Arc;
-
 
 pub struct HttpCacheManager {
     pub cache: Arc<Cache<String, Store>>,
@@ -30,7 +29,9 @@ impl HttpCacheManager {
             .eviction_policy(EvictionPolicy::lru())
             .max_capacity(cache_size)
             .build();
-        Self { cache: Arc::new(cache) }
+        Self {
+            cache: Arc::new(cache),
+        }
     }
 
     pub async fn clear(&self) -> Result<()> {
@@ -56,7 +57,10 @@ impl CacheManager for HttpCacheManager {
         response: HttpResponse,
         policy: CachePolicy,
     ) -> Result<HttpResponse> {
-        let data = Store { response: response.clone(), policy };
+        let data = Store {
+            response: response.clone(),
+            policy,
+        };
         self.cache.insert(cache_key, data).await;
         self.cache.run_pending_tasks().await;
         Ok(response)

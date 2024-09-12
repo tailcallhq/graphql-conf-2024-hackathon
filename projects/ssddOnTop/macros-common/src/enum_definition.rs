@@ -29,7 +29,9 @@ pub fn into_enum_definition(enum_value: EnumValue, name: &str) -> TypeSystemDefi
 
     TypeSystemDefinition::Type(pos(TypeDefinition {
         name: pos(Name::new(name)),
-        kind: TypeKind::Enum(EnumType { values: enum_value_definition }),
+        kind: TypeKind::Enum(EnumType {
+            values: enum_value_definition,
+        }),
         description: enum_value.description,
         directives: vec![],
         extend: false,

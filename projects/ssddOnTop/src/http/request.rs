@@ -1,6 +1,6 @@
+use crate::http::method::Method;
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
-use crate::http::method::Method;
 
 pub struct Request {
     pub method: Method,

@@ -1,3 +1,4 @@
+use crate::http::headers::HeaderMap;
 use anyhow::Result;
 use async_graphql_value::{ConstValue, Name};
 use derive_setters::Setters;
@@ -5,7 +6,6 @@ use http::StatusCode;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Bytes;
 use indexmap::IndexMap;
-use crate::http::headers::HeaderMap;
 
 #[derive(Clone, Debug, Default, Setters)]
 pub struct Response<Body> {
@@ -49,14 +49,22 @@ impl Response<Bytes> {
         let status = StatusCode::from_u16(resp.status().as_u16())?;
         let headers = HeaderMap::from(resp.headers().to_owned());
         let body = resp.bytes().await?;
-        Ok(Response { status, headers, body })
+        Ok(Response {
+            status,
+            headers,
+            body,
+        })
     }
 
     pub async fn from_hyper(resp: hyper::Response<Full<Bytes>>) -> Result<Self> {
         let status = resp.status();
         let headers = HeaderMap::from(resp.headers().to_owned());
         let body = resp.into_body().collect().await?.to_bytes();
-        Ok(Response { status, headers, body })
+        Ok(Response {
+            status,
+            headers,
+            body,
+        })
     }
 
     pub fn empty() -> Self {
@@ -66,7 +74,7 @@ impl Response<Bytes> {
             body: Bytes::new(),
         }
     }
-    pub fn to_serde_json(self) -> Result<Response<serde_json::Value>>{
+    pub fn to_serde_json(self) -> Result<Response<serde_json::Value>> {
         if self.body.is_empty() {
             return Ok(Response {
                 status: self.status,
@@ -75,7 +83,11 @@ impl Response<Bytes> {
             });
         }
         let body: serde_json::Value = serde_json::from_slice(&self.body)?;
-        Ok(Response { status: self.status, headers: self.headers, body })
+        Ok(Response {
+            status: self.status,
+            headers: self.headers,
+            body,
+        })
     }
 
     pub fn to_json<T: Default + FromValue>(self) -> Result<Response<T>> {
@@ -91,9 +103,12 @@ impl Response<Bytes> {
         // without benchmarking the performance impact.
         let body: serde_json_borrow::Value = serde_json::from_slice(&self.body)?;
         let body = T::from_value(body);
-        Ok(Response { status: self.status, headers: self.headers, body })
+        Ok(Response {
+            status: self.status,
+            headers: self.headers,
+            body,
+        })
     }
-
 
     pub fn to_resp_string(self) -> Result<Response<String>> {
         Ok(Response::<String> {

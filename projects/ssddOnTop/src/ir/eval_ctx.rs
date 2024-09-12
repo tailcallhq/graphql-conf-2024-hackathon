@@ -1,7 +1,7 @@
-use std::borrow::Cow;
-use std::sync::Arc;
 use crate::request_context::RequestContext;
 use crate::value::Value;
+use std::borrow::Cow;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct EvalContext<'a> {
@@ -9,12 +9,10 @@ pub struct EvalContext<'a> {
     pub request_ctx: &'a RequestContext,
 
     // graphql_ctx: &'a Ctx,
-
     graphql_ctx_value: Option<Value>,
 
     graphql_ctx_args: Option<Value>,
 }
-
 
 impl<'a> EvalContext<'a> {
     pub fn new(request_ctx: &'a RequestContext) -> Self {
@@ -69,4 +67,3 @@ pub fn get_path_value<'a, T: AsRef<str>>(input: &'a Value, path: &[T]) -> Option
 
     value.map(|v| Value::new(v.clone()))
 }
-
