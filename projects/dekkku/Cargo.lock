@@ -392,6 +392,7 @@ dependencies = [
  "anyhow",
  "async-graphql",
  "async-graphql-poem",
+ "bytes",
  "dashmap",
  "easy_retry",
  "futures",
@@ -400,6 +401,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "serde_json_borrow",
  "tokio",
  "tokio-retry",
 ]
@@ -1522,6 +1524,16 @@ dependencies = [
  "memchr",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_json_borrow"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "176a77dea19cf9b2cfe7f9e31966112ef8282a709af7c0a0fb28fc6347c7ba78"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
