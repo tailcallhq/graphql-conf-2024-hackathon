@@ -1,8 +1,8 @@
 Running 30s test @ http://localhost:8000/graphql
   4 threads and 100 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     8.42ms    1.10ms  16.10ms   65.84%
-    Req/Sec     2.98k   113.36     3.28k    73.17%
-  356223 requests in 30.02s, 384.90MB read
-Requests/sec:  11864.33
-Transfer/sec:     12.82MB
+    Latency     8.59ms    1.08ms  13.85ms   67.30%
+    Req/Sec     2.92k   115.06     3.21k    66.00%
+  349025 requests in 30.03s, 385.78MB read
+Requests/sec:  11624.13
+Transfer/sec:     12.85MB

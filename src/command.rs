@@ -75,6 +75,9 @@ impl Command {
         if output.status.success() {
             Ok(output)
         } else {
+            info!("Stdout is:\n {}", String::from_utf8_lossy(&output.stdout));
+            info!("Stderr is:\n {}", String::from_utf8_lossy(&output.stderr));
+
             Err(anyhow!(
                 "Process failed with exit code: {}",
                 output.status.code().unwrap_or(0)
