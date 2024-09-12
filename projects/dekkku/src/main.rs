@@ -9,6 +9,7 @@ use rand::seq::SliceRandom;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     sync::{Arc, RwLock},
     time::Duration,
 };
@@ -23,23 +24,25 @@ const ALL_POSTS: &str = "http://localhost:3000/posts";
 // can cache the POST and USER.
 #[derive(Default)]
 struct Cache {
-    posts: DashMap<i32, Post>,
-    users: DashMap<i32, User>,
+    posts: RwLock<HashMap<i32, Post>>,
+    users: RwLock<HashMap<i32, User>>,
     is_dirty: RwLock<bool>,
 }
 
 impl Cache {
     fn validate_user(&self, user: &User) {
-        if let Some(cached_user) = self.users.get(&user.id) {
+        let mut user_writer = self.users.write().unwrap();
+        if let Some(cached_user) = user_writer.get(&user.id) {
             if *cached_user != *user {
                 *self.is_dirty.write().unwrap() = true;
             }
         }
-        self.users.insert(user.id, user.clone());
+        user_writer.insert(user.id, user.clone());
     }
 
     fn validate_users(&self, users: &[User]) {
-        if self.users.is_empty() {
+        let users_reader = self.users.read().unwrap();
+        if users_reader.is_empty() {
             return;
         }
 
@@ -47,7 +50,7 @@ impl Cache {
         let selected_users: Vec<&User> = users.choose_multiple(&mut rng, 2).collect();
         if selected_users.len() == 2 {
             let are_users_same = selected_users.iter().all(|user| {
-                self.users
+                users_reader
                     .get(&user.id)
                     .map_or(false, |cached_user| *cached_user == **user)
             });
@@ -59,50 +62,57 @@ impl Cache {
     }
 
     fn validate_posts(&self, posts: &[Post]) {
-        if self.users.is_empty() {
+        let users_empty = { self.users.read().unwrap().is_empty() };
+        if users_empty {
             // fill the cache with users.
+            let mut posts_writer = self.posts.write().unwrap();
             let mut rng = rand::thread_rng();
             let selected_posts: Vec<&Post> = posts.choose_multiple(&mut rng, 2).collect();
             if selected_posts.len() == 2 {
                 for post in selected_posts {
-                    self.posts.insert(post.id, post.clone());
+                    posts_writer.insert(post.id, post.clone());
                 }
             }
         } else {
-            let mut cache_dirty = false;
-            for post in self.posts.iter() {
-                if let Some(new_post) = posts.iter().find(|p| p.id == post.id) {
-                    if *post != *new_post {
-                        cache_dirty = true;
-                        break;
+            let cache_dirty = {
+                let mut cache_dirty = false;
+                for (_, post) in self.posts.read().unwrap().iter() {
+                    if let Some(new_post) = posts.iter().find(|p| p.id == post.id) {
+                        if *post != *new_post {
+                            cache_dirty = true;
+                            break;
+                        }
                     }
                 }
-            }
+                cache_dirty
+            };
 
             if cache_dirty {
                 *self.is_dirty.write().unwrap() = true;
-                self.posts.clear();
+                self.posts.write().unwrap().clear();
             }
         }
     }
 
     fn validate_post(&self, post: &Post) {
-        let mut are_posts_same = true;
-        if let Some(cached_post) = self.posts.get(&post.id) {
-            if *post != *cached_post {
-                are_posts_same = false;
+        let are_posts_same = {
+            let mut are_posts_same = true;
+            if let Some(cached_post) = self.posts.read().unwrap().get(&post.id) {
+                if *post != *cached_post {
+                    are_posts_same = false;
+                }
             }
-        }
+            are_posts_same
+        };
 
         if !are_posts_same {
-            // clean up the users.
-            self.users.clear();
+            self.users.write().unwrap().clear();
             *self.is_dirty.write().unwrap() = true;
         }
     }
 
     fn should_fetch_users(&self, user_id: &i32) -> bool {
-        self.users.contains_key(user_id) && !*self.is_dirty.read().unwrap()
+        self.users.read().unwrap().contains_key(user_id) && !*self.is_dirty.read().unwrap()
     }
 }
 
