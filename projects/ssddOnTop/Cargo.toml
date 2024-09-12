@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+macros = {path = "./macros"}
+macros_common = {path = "./macros-common"}
 tokio = {version = "1.40.0", features = ["full"]}
 tracing = "0.1.40"
 hyper = {version = "1.4.1",features = ["http1","server"]}
@@ -43,8 +45,9 @@ moka = { version = "0.12.7", default-features = false, features = [
 async-trait = "0.1.82"
 ttl_cache = "0.5.1"
 futures-util = "0.3.30"
+http = "1.1.0"
+url = "2.5.2"
+schemars = {version = "0.8.17", features = ["derive"]}
 
 [dev-dependencies]
 http-cache = "0.18.0"
-url = "2.5.2"
-http = "1.1.0"

@@ -1,5 +1,4 @@
 use crate::config::{Arg, Cache, Config, Field, Resolver, RootSchema, Server, Type1, Upstream};
-use crate::directive::DirectiveCodec;
 use anyhow::Result;
 use async_graphql::parser::types::{
     ConstDirective, FieldDefinition, InputObjectType, InputValueDefinition, InterfaceType,
@@ -8,6 +7,7 @@ use async_graphql::parser::types::{
 };
 use async_graphql::{Name, Positioned};
 use std::collections::BTreeMap;
+use crate::directive::DirectiveCodec;
 
 const DEFAULT_SCHEMA_DEFINITION: &SchemaDefinition = &SchemaDefinition {
     extend: false,
@@ -177,7 +177,7 @@ where
     let type_of = field.type_of();
     let directives = field.directives();
 
-    let resolver = Resolver::from_directives(directives.iter())?;
+    let resolver = Resolver::from_directives(directives)?;
     Ok(Field {
         ty_of: type_of.into(),
         args,

@@ -41,12 +41,6 @@ fn compile_http(config_module: &config::Config, http: &config::Http) -> anyhow::
     )?;
 
     let ir = if http.method == Method::GET {
-        // Find a query parameter that contains a reference to the {{.value}} key
-        let key = http.query.iter().find_map(|q| {
-            Mustache::parse(&q.value)
-                .expression_contains("value")
-                .then(|| q.key.clone())
-        });
         IR::IO(IO::Http {
             req_template,
         })

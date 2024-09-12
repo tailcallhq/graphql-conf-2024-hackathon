@@ -51,7 +51,7 @@ pub enum IO {
 }
 
 impl IR {
-    pub async fn eval<'a, 'b, Ctx>(
+    pub async fn eval<'a, 'b>(
         &'a self,
         ctx: &'b mut EvalContext<'a>,
     ) -> anyhow::Result<Value> {

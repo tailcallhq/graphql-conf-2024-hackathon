@@ -17,6 +17,13 @@ pub struct EvalContext<'a> {
 
 
 impl<'a> EvalContext<'a> {
+    pub fn new(request_ctx: &'a RequestContext) -> Self {
+        Self {
+            request_ctx,
+            graphql_ctx_value: None,
+            graphql_ctx_args: None,
+        }
+    }
     pub fn path_arg<T: AsRef<str>>(&self, path: &[T]) -> Option<Cow<'a, Value>> {
         let args = self.graphql_ctx_args.as_ref()?;
         get_path_value(args.as_ref(), path).map(|a| Cow::Owned(a.clone()))

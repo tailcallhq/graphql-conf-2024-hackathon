@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::is_default;
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// The URLQuery input type represents a query parameter to be included in a
 /// URL.

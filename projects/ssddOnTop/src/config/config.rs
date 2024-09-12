@@ -1,3 +1,6 @@
+use macros_common::directive_definition;
+use crate::directive::DirectiveCodec;
+use async_graphql::Positioned;
 use crate::blueprint::wrapping_type;
 use crate::config::url_query::URLQuery;
 use crate::http::method::Method;
@@ -5,6 +8,9 @@ use crate::is_default;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::num::NonZeroU64;
+use async_graphql::parser::types::ConstDirective;
+use macros::{CustomResolver, DirectiveDefinition, InputDefinition};
+
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
@@ -70,20 +76,23 @@ pub struct Cache {
     pub max_age: NonZeroU64,
 }
 
+#[derive(
+    Serialize, Deserialize, Clone, Debug, PartialEq, Eq, schemars::JsonSchema, macros::CustomResolver,
+)]
+pub enum Resolver {
+    Http(Http),
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct Field {
     pub ty_of: wrapping_type::Type,
+    #[serde(flatten, default, skip_serializing_if = "is_default")]
     pub resolver: Option<Resolver>,
     pub args: BTreeMap<String, Arg>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Arg {
-    pub type_of: wrapping_type::Type,
-    pub default_value: Option<serde_json::Value>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, schemars::JsonSchema, DirectiveDefinition, InputDefinition)]
+#[directive_definition(locations = "FieldDefinition")]
 pub struct Http {
     pub path: String,
     #[serde(default, skip_serializing_if = "is_default")]
@@ -95,9 +104,11 @@ pub struct Http {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum Resolver {
-    Http(Http),
+pub struct Arg {
+    pub type_of: wrapping_type::Type,
+    pub default_value: Option<serde_json::Value>,
 }
+
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]

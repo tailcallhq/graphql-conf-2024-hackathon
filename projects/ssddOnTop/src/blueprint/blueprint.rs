@@ -165,7 +165,9 @@ fn populate_nested_field(
                         ),
                         Definition::InputObject(_) => None,
                     });
-                    x.and_then(|x| x.resolver.clone())
+                    // println!("resolver for: {} is {:?}", field_name.0, x);
+                    let x = x.and_then(|x| x.resolver.clone());
+                    x
                 },
                 args: field
                     .args

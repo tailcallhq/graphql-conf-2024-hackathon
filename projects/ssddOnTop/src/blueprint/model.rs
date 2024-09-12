@@ -4,6 +4,12 @@ use std::fmt::{Debug, Formatter};
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FieldName(pub String);
 
+impl AsRef<str> for FieldName {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct TypeName(pub String);
 
