@@ -48,7 +48,6 @@ impl FieldId {
 
 #[derive(Clone, Debug)]
 pub struct Arg {
-    pub id: ArgId,
     pub name: String,
     pub type_of: crate::blueprint::wrapping_type::Type,
 }
@@ -60,7 +59,6 @@ pub struct Flat(FieldId);
 
 #[derive(Clone, Debug)]
 pub struct Field {
-    pub id: FieldId,
     pub name: FieldName,
     pub type_of: crate::blueprint::wrapping_type::Type,
     pub ir: Option<IR>,

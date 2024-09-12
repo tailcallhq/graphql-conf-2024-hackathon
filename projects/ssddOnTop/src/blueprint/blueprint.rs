@@ -133,14 +133,13 @@ impl TryFrom<&Config> for Blueprint {
 
 fn fields_to_map(qry: &str, config: &Config, defs: Vec<Definition>) -> HashMap<FieldHash, Field> {
     let mut fields = HashMap::new();
-    populate_nested_field(config, qry, 0, &mut fields, &defs);
+    populate_nested_field(config, qry, &mut fields, &defs);
     fields
 }
 
 fn populate_nested_field(
     config: &Config,
     ty_name: &str,
-    field_id: usize,
     field_map: &mut HashMap<FieldHash, Field>,
     defs: &[Definition],
 ) {
@@ -149,10 +148,8 @@ fn populate_nested_field(
     if let Some(ty) = config.types.get(ty_name) {
         for (field_name, field) in ty.fields.iter() {
             let field_name = FieldName(field_name.clone());
-            populate_nested_field(config, field.ty_of.name(), field_id + 1, field_map, defs);
-            let mut arg_id = 0;
+            populate_nested_field(config, field.ty_of.name(), field_map, defs);
             let field = Field {
-                id: FieldId::new(field_id),
                 name: field_name.clone(),
                 type_of: field.ty_of.clone(),
                 ir: {
@@ -160,13 +157,13 @@ fn populate_nested_field(
                         Definition::Interface(int) => Some(
                             int.fields
                                 .iter()
-                                .find(|f| field_name.0.eq(&f.name))?
+                                .find(|f| field_name.0.eq(&f.name) && int.name.eq(ty_name))?
                                 .clone(),
                         ),
                         Definition::Object(obj) => Some(
                             obj.fields
                                 .iter()
-                                .find(|f| field_name.0.eq(&f.name))?
+                                .find(|f| field_name.0.eq(&f.name) && obj.name.eq(ty_name))?
                                 .clone(),
                         ),
                         Definition::InputObject(_) => None,
@@ -180,12 +177,9 @@ fn populate_nested_field(
                     .iter()
                     .map(|(arg_name, arg)| {
                         let arg = Arg {
-                            id: ArgId::new(arg_id),
                             name: arg_name.clone(),
                             type_of: arg.type_of.clone(),
                         };
-                        arg_id += 1;
-
                         arg
                     })
                     .collect(),
@@ -214,6 +208,6 @@ mod test {
             .read(format!("{}/schema/schema.graphql", root))
             .unwrap();
         let blueprint = crate::blueprint::Blueprint::try_from(&config).unwrap();
-        // println!("{:#?}", blueprint);
+        println!("{:#?}", blueprint.fields );
     }
 }
