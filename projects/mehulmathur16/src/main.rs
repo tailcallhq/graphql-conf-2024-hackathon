@@ -149,14 +149,12 @@ impl QueryRoot {
     }
 
     async fn user(&self, ctx: &Context<'_>, id: i32) -> async_graphql::Result<User> {
-        let client = ctx.data::<Client>().unwrap();
-        let response = client
-            .get(&format!("http://localhost:3000/users/{}", id))
-            .send()
+        let loader = ctx.data::<DataLoader<UserLoader>>().unwrap();
+        let user = loader
+            .load_one(id)
             .await?
-            .json::<User>()
-            .await?;
-        Ok(response)
+            .ok_or_else(|| async_graphql::Error::new("User not found"))?;
+        Ok(user)
     }
 }
 
