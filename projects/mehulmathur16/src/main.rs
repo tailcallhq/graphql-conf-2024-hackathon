@@ -1,8 +1,11 @@
 use actix_web::{guard, web, App, HttpServer};
+use async_graphql::dataloader::{DataLoader, Loader};
+use async_graphql::Error;
 use async_graphql::{Context, EmptyMutation, EmptySubscription, Object, Schema, SimpleObject};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse};
 use reqwest::Client;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 struct Post {
@@ -13,7 +16,7 @@ struct Post {
     body: String,
 }
 
-#[derive(SimpleObject, Deserialize)]
+#[derive(SimpleObject, Deserialize, Clone)]
 struct User {
     id: i32,
     name: String,
@@ -24,16 +27,48 @@ struct User {
     website: String,
 }
 
-#[derive(SimpleObject, Deserialize)]
+#[derive(SimpleObject, Deserialize, Clone)]
 struct Address {
     zipcode: String,
     geo: Geo,
 }
 
-#[derive(SimpleObject, Deserialize)]
+#[derive(SimpleObject, Deserialize, Clone)]
 struct Geo {
     lat: f64,
     lng: f64,
+}
+
+struct UserLoader {
+    client: Client,
+}
+
+#[async_trait::async_trait]
+impl Loader<i32> for UserLoader {
+    type Value = User;
+    type Error = Error;
+
+    async fn load(&self, keys: &[i32]) -> Result<HashMap<i32, Self::Value>, Self::Error> {
+        let ids = keys
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("&id=");
+
+        let response = self
+            .client
+            .get(&format!("http://localhost:3000/users?id={}", ids))
+            .send()
+            .await?
+            .json::<Vec<User>>()
+            .await?;
+
+        let mut user_map = HashMap::new();
+        for user in response {
+            user_map.insert(user.id, user);
+        }
+        Ok(user_map)
+    }
 }
 
 struct QueryRoot;
@@ -91,10 +126,6 @@ impl Post {
         self.id
     }
 
-    async fn user_id(&self) -> i32 {
-        self.user_id
-    }
-
     async fn title(&self) -> &str {
         &self.title
     }
@@ -104,21 +135,27 @@ impl Post {
     }
 
     async fn user(&self, ctx: &Context<'_>) -> async_graphql::Result<User> {
-        let client = ctx.data::<Client>().unwrap();
-        let response = client
-            .get(&format!("http://localhost:3000/users/{}", self.user_id))
-            .send()
+        let loader = ctx.data::<DataLoader<UserLoader>>().unwrap();
+        loader
+            .load_one(self.user_id)
             .await?
-            .json::<User>()
-            .await?;
-        Ok(response)
+            .ok_or_else(|| async_graphql::Error::new("User not found"))
     }
 }
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    let client = Client::new();
+    let user_loader = DataLoader::new(
+        UserLoader {
+            client: client.clone(),
+        },
+        tokio::spawn,
+    );
+
     let schema = Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
-        .data(Client::new())
+        .data(client)
+        .data(user_loader)
         .finish();
 
     HttpServer::new(move || {
