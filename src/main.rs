@@ -4,16 +4,8 @@ use anyhow::Result;
 use clap::Parser;
 use tracing::{error, info};
 
-use project::Project;
-
-mod benchmarks;
-mod command;
-mod graphql_tests;
-mod project;
-mod request;
-mod utils;
-
-pub const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
+use hackathon::project::Project;
+use hackathon::ROOT_DIR;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -50,7 +42,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     if let Err(error) = run().await {
-        error!("Critical error: {}", error);
+        error!("Critical error: {:#}", error);
         panic!("Critical error");
     }
 }

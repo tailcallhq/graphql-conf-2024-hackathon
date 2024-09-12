@@ -1,0 +1,55 @@
+name: Comment on pull-request
+
+on:
+  workflow_run:
+    workflows: ["Benchmark PR"]
+    types:
+      - completed
+
+jobs:
+  macro_benchmarks_comment:
+    name: Benchmark comment
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Find associated pull request
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const response = await github.rest.search.issuesAndPullRequests({
+              q: 'repo:${{ github.repository }} is:pr sha:${{ github.event.workflow_run.head_sha }}',
+              per_page: 1,
+            })
+            const items = response.data.items
+            if (items.length < 1) {
+              console.error('No PRs found')
+              return
+            }
+            const pullRequestNumber = items[0].number
+            console.info("Pull request number is", pullRequestNumber)
+            return pullRequestNumber
+
+      - name: Find Hackathon PR comment
+        uses: peter-evans/find-comment@v3
+        id: fc
+        with:
+          issue-number: ${{ steps.pr.outputs.result }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '## Hackathon Score Report'
+
+      - name: Download artifact with body message
+        uses: actions/download-artifact@v4
+        with:
+          name: body
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Create or update comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ steps.pr.outputs.result }}
+          body-path: body.md
+          edit-mode: replace

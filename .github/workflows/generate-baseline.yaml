@@ -1,0 +1,36 @@
+name: Generate Baseline
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-baseline:
+    runs-on: benchmarking-runner
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal token
+        fetch-depth: 0             # otherwise, you will fail to push refs to dest repo
+
+    - name: Install Stable Toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+
+    - name: Install Wrk
+      run: sudo apt-get update && sudo apt-get install -y wrk
+
+    - name: Build mock-server
+      run: cargo build -p mock-api --release
+
+    - name: Run generator
+      run: cargo run --bin generate-baseline
+
+    - name: Commit & Push changes
+      uses: actions-js/push@v1.5
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        directory: "reference/results"

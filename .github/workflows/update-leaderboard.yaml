@@ -1,0 +1,25 @@
+name: Collect Hackathon Scores
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *' # every hour at 0 minutes
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  leaderboard:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Stable Toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+
+    - name: Run generator
+      run: cargo run --bin github-collect-leaderboard
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
