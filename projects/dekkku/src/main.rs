@@ -94,24 +94,24 @@ impl Query {
                     }
                 }
             } else {
-                // let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
-                // let user_ids = posts.iter().map(|p| p.user_id).collect::<Vec<_>>();
-                // let users = loader.load_many(user_ids).await?;
+                let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
+                let user_ids = posts.iter().map(|p| p.user_id).collect::<Vec<_>>();
+                let users = loader.load_many(user_ids).await?;
 
-                let qp = posts
-                    .iter()
-                    .map(|p| p.user_id)
-                    .collect::<HashSet<_>>()
-                    .into_iter()
-                    .map(|user_id| format!("id={}", user_id))
-                    .collect::<Vec<_>>()
-                    .join("&");
-                let url = format!("{ALL_USERS}?{qp}");
-                let users: Vec<User> = http_client.request(&url).await?;
-                let users = users
-                    .into_iter()
-                    .map(|user| (user.id, user))
-                    .collect::<HashMap<_, _>>();
+                // let qp = posts
+                //     .iter()
+                //     .map(|p| p.user_id)
+                //     .collect::<HashSet<_>>()
+                //     .into_iter()
+                //     .map(|user_id| format!("id={}", user_id))
+                //     .collect::<Vec<_>>()
+                //     .join("&");
+                // let url = format!("{ALL_USERS}?{qp}");
+                // let users: Vec<User> = http_client.request(&url).await?;
+                // let users = users
+                //     .into_iter()
+                //     .map(|user| (user.id, user))
+                //     .collect::<HashMap<_, _>>();
                 let mut store_users = store.users.write().unwrap();
                 for post in posts.iter_mut() {
                     if let Some(user) = users.get(&post.user_id) {
