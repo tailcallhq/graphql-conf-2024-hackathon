@@ -9,7 +9,7 @@ use rand::seq::SliceRandom;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, RwLock},
     time::Duration,
 };
@@ -46,9 +46,10 @@ impl Query {
         ctx: &Context<'_>,
     ) -> std::result::Result<Vec<Post>, async_graphql::Error> {
         let http_client = ctx.data_unchecked::<Arc<RequestBatcher>>();
-        let posts: Vec<Post> = http_client.request(ALL_POSTS).await?;
+        let mut posts: Vec<Post> = http_client.request(ALL_POSTS).await?;
         let store = ctx.data_unchecked::<Arc<Store>>();
 
+        // TODO: clean this up.
         let are_posts_same = {
             let is_cache_empty = store.posts.read().unwrap().is_empty();
             if is_cache_empty {
@@ -80,12 +81,50 @@ impl Query {
             }
         };
 
-        if !are_posts_same {
-            // clean up the users.
-            store.users.write().unwrap().clear();
+        let should_query_user = ctx
+            .field()
+            .selection_set()
+            .any(|field| field.name() == "user");
+
+        if should_query_user {
+            if are_posts_same {
+                // Posts are the same, load the data from store and update the posts' user property.
+                let store_users = store.users.read().unwrap();
+                for post in posts.iter_mut() {
+                    if let Some(cached_user) = store_users.get(&post.user_id) {
+                        post.user = Some(cached_user.clone());
+                    }
+                }
+            } else {
+                // let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
+                // let user_ids = posts.iter().map(|p| p.user_id).collect::<Vec<_>>();
+                // let users = loader.load_many(user_ids).await?;
+
+                let qp = posts
+                    .iter()
+                    .map(|p| p.user_id)
+                    .collect::<HashSet<_>>()
+                    .into_iter()
+                    .map(|user_id| format!("id={}", user_id))
+                    .collect::<Vec<_>>()
+                    .join("&");
+                let url = format!("{ALL_USERS}?{qp}");
+                let users: Vec<User> = http_client.request(&url).await?;
+                let users = users
+                    .into_iter()
+                    .map(|user| (user.id, user))
+                    .collect::<HashMap<_, _>>();
+                let mut store_users = store.users.write().unwrap();
+                for post in posts.iter_mut() {
+                    if let Some(user) = users.get(&post.user_id) {
+                        post.user = Some(user.clone());
+                        store_users.insert(user.id, user.clone());
+                    }
+                }
+            }
+            *store.is_dirty.write().unwrap() = !are_posts_same;
         }
 
-        *store.is_dirty.write().unwrap() = !are_posts_same;
         Ok(posts)
     }
 
@@ -96,21 +135,6 @@ impl Query {
     ) -> std::result::Result<Option<Post>, async_graphql::Error> {
         let loader = ctx.data_unchecked::<DataLoader<PostLoader>>();
         let post = loader.load_one(id).await?;
-        if let Some(actual_post) = post.as_ref() {
-            let store = ctx.data_unchecked::<Arc<Store>>();
-            let mut are_posts_same = true;
-            if let Some(cached_post) = store.posts.read().unwrap().get(&id) {
-                if actual_post != cached_post {
-                    *store.is_dirty.write().unwrap() = true;
-                    are_posts_same = false;
-                }
-            }
-            if !are_posts_same {
-                // clean up the users.
-                store.users.write().unwrap().clear();
-            }
-            store.posts.write().unwrap().insert(id, actual_post.clone());
-        }
         Ok(post)
     }
 
@@ -120,24 +144,6 @@ impl Query {
     ) -> std::result::Result<Vec<User>, async_graphql::Error> {
         let http_client = ctx.data_unchecked::<Arc<RequestBatcher>>();
         let users: Vec<User> = http_client.request(ALL_USERS).await?;
-
-        let store = ctx.data_unchecked::<Arc<Store>>();
-        let mut rng = rand::thread_rng();
-        let selected_users: Vec<&User> = users.choose_multiple(&mut rng, 2).collect();
-
-        if selected_users.len() == 2 {
-            let users_writer = store.users.read().unwrap();
-            let are_users_same = selected_users.iter().all(|user| {
-                users_writer
-                    .get(&user.id)
-                    .map_or(false, |cached_user| cached_user == *user)
-            });
-
-            if !are_users_same {
-                *store.is_dirty.write().unwrap() = true;
-            }
-        }
-
         Ok(users)
     }
 
@@ -148,61 +154,19 @@ impl Query {
     ) -> std::result::Result<Option<User>, async_graphql::Error> {
         let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
         let user = loader.load_one(id).await?;
-        if let Some(actual_user) = &user {
-            let store = ctx.data_unchecked::<Arc<Store>>();
-            if let Some(cached_user) = store.users.read().unwrap().get(&id) {
-                if cached_user != actual_user {
-                    *store.is_dirty.write().unwrap() = true;
-                }
-            }
-            store.users.write().unwrap().insert(id, actual_user.clone());
-        }
         Ok(user)
     }
 }
 
 #[derive(SimpleObject, Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
-#[graphql(complex)]
 struct Post {
     id: i32,
     #[graphql(name = "userId")]
     user_id: i32,
     title: Option<String>,
     body: Option<String>,
-}
-
-#[ComplexObject]
-impl Post {
-    async fn user(
-        &self,
-        ctx: &Context<'_>,
-    ) -> std::result::Result<Option<User>, async_graphql::Error> {
-        let store = ctx.data_unchecked::<Arc<Store>>();
-        if !*store.is_dirty.read().unwrap()
-            && store.users.read().unwrap().contains_key(&self.user_id)
-        {
-            let user = store.users.read().unwrap().get(&self.user_id).cloned();
-            Ok(user)
-        } else {
-            let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
-            let user = loader.load_one(self.user_id).await?;
-
-            if let Some(actual_user) = user.as_ref() {
-                if let Some(cached_user) = store.users.read().unwrap().get(&self.user_id) {
-                    if cached_user != actual_user {
-                        *store.is_dirty.write().unwrap() = true;
-                    }
-                }
-                store
-                    .users
-                    .write()
-                    .unwrap()
-                    .insert(self.user_id, actual_user.clone());
-            }
-            Ok(user)
-        }
-    }
+    user: Option<User>,
 }
 
 #[derive(SimpleObject, Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -240,6 +204,7 @@ impl Loader<i32> for PostLoader {
         keys: &[i32],
     ) -> std::result::Result<std::collections::HashMap<i32, Self::Value>, Self::Error> {
         let mut result = std::collections::HashMap::new();
+        // too slow, make it parallel.
         for &id in keys {
             let url = format!("{}/posts/{}", BASE_URL, id);
             let post: Post = self.0.request(&url).await?;
@@ -277,8 +242,8 @@ async fn fetch_with_retry(
     url: &str,
 ) -> std::result::Result<reqwest::Response, reqwest::Error> {
     let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(3); // Retry up to 3 times
-
-    Retry::spawn(retry_strategy, || client.get(url).send()).await
+    let result = Retry::spawn(retry_strategy, || client.get(url).send()).await;
+    result
 }
 
 #[allow(dead_code)]
