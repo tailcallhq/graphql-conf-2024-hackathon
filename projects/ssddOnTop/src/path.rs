@@ -83,6 +83,7 @@ impl<'a> EvalContext<'a> {
         let ctx = self;
 
         if path.is_empty() {
+            println!("none0");
             return None;
         }
 
@@ -93,7 +94,10 @@ impl<'a> EvalContext<'a> {
                /* "vars" => Some(ValueString::String(Cow::Owned(
                     json!(ctx.vars()).to_string(),
                 ))),*/
-                _ => None,
+                _ => {
+                    println!("none");
+                    None
+                },
             };
         }
 
@@ -108,7 +112,10 @@ impl<'a> EvalContext<'a> {
                     ctx.var(tail[0].as_ref())?,
                 ))),*/
                 // "env" => Some(ValueString::String(ctx.env_var(tail[0].as_ref())?)),
-                _ => None,
+                _ => {
+                    println!("none1");
+                    None
+                },
             })
     }
 }
@@ -122,7 +129,9 @@ impl<'a> PathValue for EvalContext<'a> {
 impl<'a> PathString for EvalContext<'a> {
     fn path_string<T: AsRef<str>>(&self, path: &[T]) -> Option<Cow<'_, str>> {
         self.to_raw_value(path).and_then(|value| match value {
-            ValueString::String(env) => Some(env),
+            ValueString::String(env) => {
+                Some(env)
+            },
             ValueString::Value(value) => convert_value(value),
         })
     }

@@ -1,13 +1,15 @@
 use std::ops::Deref;
-use crate::blueprint::Blueprint;
+use crate::blueprint::{Blueprint, FieldHash};
 use crate::http::request::Request;
 use bytes::Bytes;
 use http_body_util::Full;
 use std::sync::Arc;
 use crate::app_ctx::AppCtx;
+use crate::blueprint::model::{FieldName, TypeName};
 use crate::http::method::Method;
 use crate::ir::eval_ctx::EvalContext;
 use crate::request_context::RequestContext;
+use crate::value::Value;
 
 pub async fn handle_request(
     req: Request,
@@ -45,15 +47,27 @@ async fn handle_gql_req(
     let req_ctx = create_request_context(&app_ctx);
     if let Some(query) = app_ctx.blueprint.schema.query.as_ref() {
         let mut eval_ctx = EvalContext::new(&req_ctx);
+        let x = app_ctx.blueprint.fields.get(&FieldHash {
+            name: FieldName("post".to_string()),
+            id: TypeName(query.to_string()),
+        });
+        let x = x.as_ref().unwrap().ir.as_ref().unwrap();
+        let mut map = serde_json::Map::new();
+        let key = "id".to_string();
+        let val = serde_json::Value::Number(serde_json::Number::from(1));
+        map.insert(key, val);
+        eval_ctx = eval_ctx.with_args(Value::new(serde_json::Value::Object(map)));
 
-        for (_,field) in app_ctx.blueprint.fields.iter() {
+        let x = x.eval(&mut eval_ctx).await?;
+        println!("{}", x);
+        /*for (_,field) in app_ctx.blueprint.fields.iter() {
             if let Some(ir) = field.ir.as_ref() {
                 println!("hx: {}", field.name.as_ref());
                 println!("{}", ir.eval(&mut eval_ctx).await?);
             }else {
                 println!("hx1: {}", field.name.as_ref());
             }
-        }
+        }*/
         Ok(
             hyper::Response::new(Full::new(Bytes::from_static(
                 b"Printed",

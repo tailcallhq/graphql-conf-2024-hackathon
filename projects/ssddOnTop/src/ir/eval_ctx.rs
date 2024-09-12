@@ -10,9 +10,9 @@ pub struct EvalContext<'a> {
 
     // graphql_ctx: &'a Ctx,
 
-    graphql_ctx_value: Option<Arc<Value>>,
+    graphql_ctx_value: Option<Value>,
 
-    graphql_ctx_args: Option<Arc<Value>>,
+    graphql_ctx_args: Option<Value>,
 }
 
 
@@ -24,15 +24,27 @@ impl<'a> EvalContext<'a> {
             graphql_ctx_args: None,
         }
     }
+    pub fn with_value(self, value: Value) -> Self {
+        Self {
+            graphql_ctx_value: Some(value),
+            ..self
+        }
+    }
+    pub fn with_args(self, args: Value) -> Self {
+        Self {
+            graphql_ctx_args: Some(args),
+            ..self
+        }
+    }
     pub fn path_arg<T: AsRef<str>>(&self, path: &[T]) -> Option<Cow<'a, Value>> {
         let args = self.graphql_ctx_args.as_ref()?;
-        get_path_value(args.as_ref(), path).map(|a| Cow::Owned(a.clone()))
+        get_path_value(args, path).map(|a| Cow::Owned(a.clone()))
     }
 
     pub fn path_value<T: AsRef<str>>(&self, path: &[T]) -> Option<Cow<'a, Value>> {
         // TODO: add unit tests for this
         if let Some(value) = self.graphql_ctx_value.as_ref() {
-            get_path_value(value.as_ref(), path).map(|a| Cow::Owned(a))
+            get_path_value(value, path).map(|a| Cow::Owned(a))
         } else {
             Some(Cow::Owned(Value::new(serde_json::Value::Null)))
             // get_path_value(self.graphql_ctx.value()?, path).map(Cow::Borrowed)

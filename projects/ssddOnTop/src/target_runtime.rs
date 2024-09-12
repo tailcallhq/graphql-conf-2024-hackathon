@@ -19,14 +19,13 @@ impl TargetRuntime {
     }
 }
 
-mod cache {
+pub mod cache {
     use std::hash::Hash;
     use std::num::NonZeroU64;
     use std::sync::{Arc, RwLock};
     use std::time::Duration;
 
     use ttl_cache::TtlCache;
-    use crate::value::ToInner;
 
     pub struct InMemoryCache<K: Hash + Eq, V> {
         data: Arc<RwLock<TtlCache<K, V>>>,
@@ -48,15 +47,15 @@ mod cache {
         }
     }
 
-    impl<K: Hash + Eq + Send + Sync, V: Send + Sync + ToInner<Inner=Inner>, Inner: Clone> InMemoryCache<K, V> {
+    impl<K: Hash + Eq + Send + Sync, V: Clone + Send + Sync> InMemoryCache<K, V> {
         pub async fn set<'a>(&'a self, key: K, value: V, ttl: NonZeroU64) -> anyhow::Result<()> {
             let ttl = Duration::from_millis(ttl.get());
             self.data.write().unwrap().insert(key, value, ttl);
             Ok(())
         }
 
-        pub async fn get<'a>(&'a self, key: &'a K) -> anyhow::Result<Option<Inner>> {
-            let val = self.data.read().unwrap().get(key).map(|v| v.to_inner());
+        pub async fn get<'a>(&'a self, key: &'a K) -> anyhow::Result<Option<V>> {
+            let val = self.data.read().unwrap().get(key).cloned();
             Ok(val)
         }
     }

@@ -8,6 +8,7 @@ use crate::target_runtime::TargetRuntime;
 use crate::value::Value;
 use derive_setters::Setters;
 use crate::dl::dedupe::Dedupe;
+use crate::target_runtime::cache::InMemoryCache;
 
 #[derive(Clone)]
 pub struct CacheErr(String);
@@ -31,8 +32,8 @@ pub struct RequestContext {
     pub min_max_age: Arc<Mutex<Option<i32>>>,
     pub cache_public: Arc<Mutex<Option<bool>>>,
     pub runtime: TargetRuntime,
-    // pub cache: DedupeResult<IoId, ConstValue, anyhow::Error>,
-    pub cache: Dedupe<IoId, Result<Value, CacheErr>>,
+    pub cache: InMemoryCache<IoId, Value>,
+    // pub cache: Dedupe<IoId, Result<Value, CacheErr>>,
 }
 
 impl RequestContext {
@@ -43,7 +44,8 @@ impl RequestContext {
             min_max_age: Arc::new(Mutex::new(None)),
             cache_public: Arc::new(Mutex::new(None)),
             runtime: target_runtime,
-            cache: Dedupe::new(1, true),
+            // cache: Dedupe::new(1, true),
+            cache: InMemoryCache::new(),
         }
     }
     fn set_min_max_age_conc(&self, min_max_age: i32) {
@@ -74,7 +76,7 @@ impl RequestContext {
         }
     }
 
-    pub async fn cache_get(&self, key: &IoId) -> Result<Option<serde_json_borrow::Value<'static>>, anyhow::Error> {
+    pub async fn cache_get(&self, key: &IoId) -> Result<Option<Value>, anyhow::Error> {
         self.runtime.cache.get(key).await
     }
 
@@ -97,7 +99,8 @@ impl From<&AppCtx> for RequestContext {
             min_max_age: Arc::new(Mutex::new(None)),
             cache_public: Arc::new(Mutex::new(None)),
             runtime: app_ctx.runtime.clone(),
-            cache: Dedupe::new(1, true),
+            // cache: Dedupe::new(1, true),
+            cache: InMemoryCache::new(),
         }
     }
 }

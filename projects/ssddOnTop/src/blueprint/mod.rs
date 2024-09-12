@@ -1,6 +1,6 @@
 mod blueprint;
 mod definitions;
-mod model;
+pub mod model;
 mod operators;
 pub mod wrapping_type;
 

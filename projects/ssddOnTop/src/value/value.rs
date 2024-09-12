@@ -1,19 +1,6 @@
 use std::fmt::{Display, Formatter};
 use derive_getters::Getters;
 
-pub trait ToInner {
-    type Inner;
-    fn to_inner(&self) -> Self::Inner;
-}
-
-impl ToInner for Value {
-    type Inner = serde_json_borrow::Value<'static>;
-
-    fn to_inner(&self) -> Self::Inner {
-        self.borrowed.clone()
-    }
-}
-
 #[derive(Getters, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Value {
     serde: serde_json::Value,
