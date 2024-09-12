@@ -1,11 +1,14 @@
 use actix_web::{guard, web, App, HttpServer};
 use async_graphql::dataloader::{DataLoader, Loader};
-use async_graphql::Error;
 use async_graphql::{Context, EmptyMutation, EmptySubscription, Object, Schema, SimpleObject};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse};
 use reqwest::Client;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+type GlobalCache = Arc<Mutex<HashMap<i32, Post>>>;
 
 #[derive(Deserialize, Clone)]
 struct Post {
@@ -46,7 +49,7 @@ struct UserLoader {
 #[async_trait::async_trait]
 impl Loader<i32> for UserLoader {
     type Value = User;
-    type Error = Error;
+    type Error = async_graphql::Error;
 
     async fn load(&self, keys: &[i32]) -> Result<HashMap<i32, Self::Value>, Self::Error> {
         let ids = keys
@@ -78,7 +81,7 @@ struct PostsLoader {
 #[async_trait::async_trait]
 impl Loader<i32> for PostsLoader {
     type Value = Post;
-    type Error = Error;
+    type Error = async_graphql::Error;
 
     async fn load(&self, keys: &[i32]) -> Result<HashMap<i32, Self::Value>, Self::Error> {
         let futures = keys.iter().map(|&id| {
@@ -120,21 +123,39 @@ struct QueryRoot;
 impl QueryRoot {
     async fn posts(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<Post>> {
         let client = ctx.data::<Client>().unwrap();
+        let cache = ctx.data::<GlobalCache>().unwrap().clone();
+
         let response = client
             .get("http://localhost:3000/posts")
             .send()
             .await?
             .json::<Vec<Post>>()
             .await?;
+
+        let mut cache_lock = cache.lock().await;
+        for post in &response {
+            cache_lock.insert(post.id, post.clone());
+        }
+
         Ok(response)
     }
 
     async fn post(&self, ctx: &Context<'_>, id: i32) -> async_graphql::Result<Post> {
+        let cache = ctx.data::<GlobalCache>().unwrap().clone();
+        let mut cache_lock = cache.lock().await;
+
+        if let Some(post) = cache_lock.get(&id).cloned() {
+            return Ok(post);
+        }
+
         let loader = ctx.data::<DataLoader<PostsLoader>>().unwrap();
-        loader
+        let post = loader
             .load_one(id)
             .await?
-            .ok_or_else(|| async_graphql::Error::new("Post not found"))
+            .ok_or_else(|| async_graphql::Error::new("Post not found"))?;
+
+        cache_lock.insert(id, post.clone());
+        Ok(post)
     }
 
     async fn users(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<User>> {
@@ -186,6 +207,7 @@ impl Post {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let client = Client::new();
+    let cache: Arc<Mutex<HashMap<i32, Post>>> = Arc::new(Mutex::new(HashMap::new()));
     let user_loader = DataLoader::new(
         UserLoader {
             client: client.clone(),
@@ -202,6 +224,7 @@ async fn main() -> std::io::Result<()> {
 
     let schema = Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
         .data(client)
+        .data(cache.clone())
         .data(user_loader)
         .data(posts_loader)
         .finish();
