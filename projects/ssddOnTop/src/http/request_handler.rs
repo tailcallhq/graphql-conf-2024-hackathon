@@ -15,7 +15,9 @@ pub async fn handle_request(
     app_ctx: AppCtx,
 ) -> anyhow::Result<hyper::Response<Full<Bytes>>> {
     let resp = match req.method {
-        Method::GET => hyper::Response::new(Full::new(Bytes::from_static(b"Hello, World!"))),
+        Method::GET => hyper::Response::builder()
+            .status(hyper::StatusCode::OK)
+            .body(Full::new(Bytes::from(async_graphql::http::GraphiQLSource::build().finish())))?,
         Method::POST => handle_gql_req(req, app_ctx).await?,
         _ => hyper::Response::builder()
             .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
@@ -39,6 +41,8 @@ async fn handle_gql_req(
         let eval_ctx = EvalContext::new(&req_ctx);
         let path_finder = PathFinder::new(doc, &app_ctx.blueprint);
         let fields = path_finder.exec().await;
+        let borrowed_fields = fields.to_borrowed();
+
         let resolved = fields.resolve(eval_ctx).await?;
         let finalized = resolved.finalize();
         Ok(hyper::Response::new(Full::new(Bytes::from(

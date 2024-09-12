@@ -33,18 +33,6 @@ impl<'a> EvalContext<'a> {
             ..self
         }
     }
-    pub fn clear_args(self) -> Self {
-        Self {
-            graphql_ctx_args: None,
-            ..self
-        }
-    }
-    pub fn clear_value(self) -> Self {
-        Self {
-            graphql_ctx_value: None,
-            ..self
-        }
-    }
     pub fn path_arg<T: AsRef<str>>(&self, path: &[T]) -> Option<Cow<'a, Value>> {
         let args = self.graphql_ctx_args.as_ref()?;
         get_path_value(args, path).map(|a| Cow::Owned(a.clone()))

@@ -1,15 +1,15 @@
-use std::borrow::Cow;
-use std::fmt::{Debug, Formatter};
-use std::future::Future;
-use std::pin::Pin;
 use crate::blueprint::model::{FieldName, TypeName};
 use crate::blueprint::{Blueprint, FieldHash};
+use crate::ir::eval_ctx::EvalContext;
 use crate::ir::IR;
+use crate::json::JsonObjectLike;
 use crate::value::Value;
 use async_graphql::parser::types::{DocumentOperations, ExecutableDocument, OperationType, Selection, SelectionSet};
 use async_graphql::Positioned;
 use serde_json::Map;
-use crate::ir::eval_ctx::EvalContext;
+use std::fmt::Debug;
+use std::future::Future;
+use std::pin::Pin;
 
 pub struct PathFinder<'a> {
     doc: ExecutableDocument,
@@ -20,7 +20,12 @@ pub struct Fields {
     fields: Vec<Field>,
 }
 
-// #[derive(Debug)]
+#[derive(Debug)]
+pub struct Fields1<'a> {
+    fields: Vec<Field1<'a>>,
+}
+
+#[derive(Debug)]
 // TODO: give it a lifetime
 // it won't make much difference..
 // but anyways
@@ -33,85 +38,185 @@ pub struct Field {
     pub resolved: Option<Value>,
 }
 
-pub struct Field1<'a> {
-    value: serde_json_borrow::Value<'a>,
-    pub name: &'a str,
-    pub type_of: crate::blueprint::wrapping_type::Type,
-    nexted: Vec<Field1<'a>>,
-    pub args: Option<Value>,
-}
-
-impl Debug for Field {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut debug_struct = f.debug_struct("Field");
-        debug_struct.field("name", &self.name);
-        if self.ir.is_some() {
-            debug_struct.field("ir", &"Some(..)");
+impl Fields {
+    #[inline(always)]
+    pub fn to_borrowed<'a>(&'a self) -> Fields1<'a> {
+        let fields = Self::borrowed_inner(&self.fields);
+        Fields1 {
+            fields,
         }
-        debug_struct.field("type_of", &self.type_of);
-        if self.args.is_some() {
-            debug_struct.field("args", &self.args);
-        }
-        if self.resolved.is_some() {
-            debug_struct.field("resolved", &self.resolved.as_ref().map(|v| v.serde()));
-        }
-        debug_struct.field("nested", &self.nested);
-        debug_struct.finish()
     }
+
+    #[inline(always)]
+    pub fn borrowed_inner<'a>(vec: &'a [Field]) -> Vec<Field1<'a>> {
+        let mut ans = vec![];
+        for field in vec.iter() {
+            let field = Field1 {
+                ir: field.ir.as_ref(),
+                name: field.name.as_str(),
+                type_of: &field.type_of,
+                nested: Self::borrowed_inner(&field.nested),
+                args: field.args.as_ref(),
+                resolved: field.resolved.as_ref().map(|v| serde_json_borrow::Value::from(v.serde())),
+            };
+            ans.push(field);
+        }
+        ans
+    }
+
 }
 
+#[derive(Debug)]
+pub struct Field1<'a> {
+    ir: Option<&'a IR>,
+    pub name: &'a str,
+    pub type_of: &'a crate::blueprint::wrapping_type::Type,
+    nested: Vec<Field1<'a>>,
+    pub args: Option<&'a Value>,
+    pub resolved: Option<serde_json_borrow::Value<'a>>,
+}
 impl Fields {
     #[inline(always)]
     pub fn finalize(self) -> serde_json::Value {
         let mut map = Map::new();
-        for field in self.fields {
-            if field.nested.is_empty() {
-                map.insert(field.name.clone(), field.resolved.unwrap_or(Value::new(serde_json::Value::Null)).into_serde());
-            } else {
-                let nested_value = Fields { fields: field.nested }.finalize();
-                map.insert(field.name.clone(), nested_value);
+        for field in self.fields.iter() {
+            let name = field.name.as_str().to_string();
+            let val = Self::finalize_inner(field, None, None);
+            map.insert(name, val);
+        }
+        let mut ans = Map::new();
+        ans.insert("data".to_string(), serde_json::Value::Object(map));
+        // map.insert("data".to_string(), self.finalize_inner());
+        // serde_json::Value::Object(map)
+        serde_json::Value::Object(ans)
+    }
+    #[inline(always)]
+    fn finalize_inner<'a>(field: &'a Field, mut value: Option<&'a serde_json::Value>, index: Option<usize>) -> serde_json::Value {
+        if let Some(val) = &field.resolved {
+            if value.is_none() {
+                value = Some(val.serde());
             }
         }
-        let mut data = Map::new();
-        data.insert("data".to_string(), serde_json::Value::Object(map));
-        serde_json::Value::Object(data)
+        if let Some(val) = value {
+            match (val.as_array(), val.as_object()) {
+                (_, Some(obj)) => {
+                    let mut ans = Map::new();
+
+                    if field.nested.is_empty() {
+                        let val = obj.get_key(field.name.as_str());
+                        let value = Self::finalize_inner(field, val, index);
+                        ans.insert(field.name.as_str().to_string(), value);
+                    } else {
+                        for child in field.nested.iter() {
+                            let child_name = child.name.as_str().to_string();
+                            let val = obj.get_key(child.name.as_str());
+                            let val = Self::finalize_inner(child, val, index);
+                            ans.insert(child_name, val);
+                        }
+                    }
+
+                    serde_json::Value::Object(ans)
+                }
+                (Some(arr), _) => {
+                    if let Some(index) = index {
+                        let val = arr.get(index);
+                        let val = Self::finalize_inner(field, val, None);
+                        val
+                    } else {
+                        let mut ans = vec![];
+                        for (i, val) in arr.iter().enumerate() {
+                            let val = Self::finalize_inner(field, Some(val), Some(i));
+                            ans.push(val);
+                        }
+                        serde_json::Value::Array(ans)
+                    }
+                }
+                _ => value.cloned().unwrap_or_default(),
+            }
+        } else {
+            serde_json::Value::Null
+        }
     }
     #[inline(always)]
     pub async fn resolve<'a>(mut self, eval_context: EvalContext<'a>) -> anyhow::Result<Fields> {
         let mut ans = vec![];
-        ans = Self::resolve_inner(self.fields, eval_context).await?;
+        ans = Self::resolve_inner(self.fields, eval_context, None).await?;
         Ok(Fields {
             fields: ans,
         })
     }
 
     #[inline(always)]
-    fn resolve_inner<'a>(fields: Vec<Field>, mut eval_context: EvalContext<'a>) -> Pin<Box<dyn Future<Output = anyhow::Result<Vec<Field>>> + Send + 'a>> {
+    fn resolve_inner<'a>(fields: Vec<Field>, mut eval_context: EvalContext<'a>, parent: Option<Value>) -> Pin<Box<dyn Future<Output=anyhow::Result<Vec<Field>>> + Send + 'a>> {
         Box::pin(async move {
             let mut ans = vec![];
             for mut field in fields {
+                let mut parent_val = None;
+
                 if let Some(ir) = field.ir.clone() {
                     if let Some(val) = field.args.clone() {
                         eval_context = eval_context.with_args(val);
                     }
-                    let val = ir.eval(&mut eval_context.clone()).await?;
-                    eval_context = eval_context.with_value(val.clone());
-                    field.resolved = Some(val);
-                } else {
-                    // println!("{:?}", eval_context.graphql_ctx_value);
-                    let val = eval_context.path_value(&[field.name.as_str()]);
-                    // println!("{}", val.is_some());
-                    let val = val.unwrap_or(Cow::Owned(Value::new(serde_json::Value::Null))).into_owned();
 
-                    // println!("field: {} val: {}",field.name, val);
-                    // eval_context = eval_context.with_value(val.clone());
-                    field.resolved = Some(val);
+                    let val = match &parent {
+                        Some(val) => {
+                            match val.clone().into_serde() {
+                                serde_json::Value::Array(arr) => {
+                                    let mut ans = vec![];
+                                    for val in arr {
+                                        eval_context = eval_context.with_value(Value::new(val));
+                                        let val = ir.eval(&mut eval_context.clone()).await?;
+                                        ans.push(val.into_serde());
+                                    }
+                                    Some(Value::new(serde_json::Value::Array(ans)))
+                                }
+                                val => {
+                                    eval_context = eval_context.with_value(Value::new(val));
+                                    let val = ir.eval(&mut eval_context.clone()).await?;
+                                    Some(val)
+                                }
+                            }
+                        }
+                        None => {
+                            let val = ir.eval(&mut eval_context.clone()).await?;
+                            Some(val)
+                        }
+                    };
+                    parent_val = val.clone();
+                    field.resolved = val;
+                } else {
+                    // println!("hx: {}", field.name);
+                    // let val = Self::resolve_non_ir(eval_context.graphql_ctx_value.as_ref().map(|v| v.serde()).unwrap_or(&serde_json::Value::Null), field.name.as_str());
+                    // println!("{}",val);
+                    // let val = eval_context.path_value(&[field.name.as_str()]);
+                    // let val = val.unwrap_or(Cow::Owned(Value::new(serde_json::Value::Null))).into_owned();
+                    // field.resolved = Some(Value::new(val));
                 }
-                field.nested = Self::resolve_inner(field.nested, eval_context.clone()).await?;
+
+                let eval_ctx_clone = eval_context.clone();
+                field.nested = Self::resolve_inner(field.nested, eval_ctx_clone, parent_val).await?;
                 ans.push(field);
             }
             Ok(ans)
         })
+    }
+    #[inline(always)]
+    fn resolve_non_ir(value: &serde_json::Value, key: &str) -> serde_json::Value {
+        match value {
+            serde_json::Value::Array(arr) => {
+                let mut ans = vec![];
+                for val in arr {
+                    ans.push(Self::resolve_non_ir(val, key));
+                }
+                serde_json::Value::Array(ans)
+            }
+            serde_json::Value::Object(obj) => {
+                let mut ans = Map::new();
+                obj.get_key(key).map(|v| ans.insert(key.to_string(), v.clone())).unwrap_or_default();
+                serde_json::Value::Object(ans)
+            }
+            val => val.clone(),
+        }
     }
 }
 
@@ -148,7 +253,28 @@ impl<'a> PathFinder<'a> {
                     }
                 }
             }
-            DocumentOperations::Multiple(_) => todo!()
+            DocumentOperations::Multiple(multi) => {
+                let (_,single) = multi.iter().next().unwrap();
+                let operation = &single.node;
+                let selection_set = &operation.selection_set.node;
+                let ty = match &operation.ty {
+                    OperationType::Query => {
+                        let query = self.blueprint.schema.query.as_ref().map(|v| v.as_str());
+                        query
+                    }
+                    OperationType::Mutation => None,
+                    OperationType::Subscription => None,
+                };
+                if let Some(ty) = ty {
+                    Fields {
+                        fields: self.iter(selection_set, ty),
+                    }
+                } else {
+                    Fields {
+                        fields: vec![],
+                    }
+                }
+            }
         }
     }
     #[inline(always)]
@@ -161,23 +287,6 @@ impl<'a> PathFinder<'a> {
         for selection in &selection.items {
             match &selection.node {
                 Selection::Field(Positioned { node: gql_field, .. }) => {
-                    // let conditions = self.include(&gql_field.directives);
-
-                    /*for directive in &gql_field.directives {
-                        let directive = &directive.node;
-                        if directive.name.node == "skip" || directive.name.node == "include" {
-                            continue;
-                        }
-                        let arguments = directive
-                            .arguments
-                            .iter()
-                            .map(|(k, v)| (k.node.to_string(), v.node.clone()))
-                            .collect::<Vec<_>>();
-                        // println!("directive args: {:?}", arguments);
-                    }*/
-
-                    // let (include, skip) = conditions.into_variable_tuple();
-
                     let field_name = gql_field.name.node.as_str();
                     let request_args = gql_field
                         .arguments
@@ -185,39 +294,7 @@ impl<'a> PathFinder<'a> {
                         .map(|(k, v)| (k.node.as_str().to_string(), v.node.to_owned().into_const().map(|v| v.into_json().ok()).flatten().unwrap()))
                         .collect::<Map<_, _>>();
 
-                    // println!("req args: {:?}", request_args);
-                    // println!("{}: {}",field_name, type_condition);
-                    // println!("{:#?}", self.blueprint.fields);
-
                     if let Some(field_def) = self.blueprint.fields.get(&FieldHash::new(FieldName(field_name.to_string()), TypeName(type_condition.to_string()))) {
-                        // let mut args = Vec::with_capacity(request_args.len());
-                        /*                 if let QueryField::Field((_, schema_args)) = field_def {
-                                         for (arg_name, arg_value) in schema_args {
-                                             let type_of = arg_value.of_type.clone();
-                                             let id = ArgId::new(self.arg_id.next());
-                                             let name = arg_name.clone();
-                                             let default_value = arg_value
-                                                 .default_value
-                                                 .as_ref()
-                                                 .and_then(|v| v.to_owned().try_into().ok());
-                                             args.push(Arg {
-                                                 id,
-                                                 name,
-                                                 type_of,
-                                                 // TODO: handle errors for non existing request_args without the
-                                                 // default
-                                                 value: request_args.get(arg_name).cloned(),
-                                                 default_value,
-                                             });
-                                         }
-                                     }*/
-
-                        /*            let type_of = match field_def {
-                                        QueryField::Field((field_def, _)) => field_def.of_type.clone(),
-                                        QueryField::InputField(field_def) => field_def.of_type.clone(),
-                                    };
-
-                                    let id = FieldId::new(self.field_id.next());*/
                         let type_of = field_def.type_of.clone();
                         let child_fields = self.iter(
                             &gql_field.selection_set.node,
@@ -235,51 +312,8 @@ impl<'a> PathFinder<'a> {
                             resolved: None,
                         };
 
-                        /*                 let ir = match field_def {
-                                             QueryField::Field((field_def, _)) => field_def.resolver.clone(),
-                                             _ => None,
-                                         };
-                                         let flat_field = Field {
-                                             id,
-                                             name: field_name.to_string(),
-                                             output_name: gql_field
-                                                 .alias
-                                                 .as_ref()
-                                                 .map(|a| a.node.to_string())
-                                                 .unwrap_or(field_name.to_owned()),
-                                             ir,
-                                             type_of,
-                                             type_condition: Some(type_condition.to_string()),
-                                             skip,
-                                             include,
-                                             args,
-                                             pos: selection.pos.into(),
-                                             extensions: exts.clone(),
-                                             directives,
-                                         };*/
-
                         fields.push(field);
-                        // fields = fields.merge_right(child_fields);
-                    } /*else if field_name == "__typename" {
-                        let flat_field = Field {
-                            id: FieldId::new(self.field_id.next()),
-                            name: field_name.to_string(),
-                            output_name: field_name.to_string(),
-                            ir: None,
-                            type_of: Type::Named { name: "String".to_owned(), non_null: true },
-                            // __typename has a special meaning and could be applied
-                            // to any type
-                            type_condition: None,
-                            skip,
-                            include,
-                            args: Vec::new(),
-                            pos: selection.pos.into(),
-                            extensions: exts.clone(),
-                            directives,
-                        };
-
-                        fields.push(flat_field);
-                    }*/
+                    }
                 }
                 _ => (),
             }

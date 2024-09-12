@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Getters, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Value {
     serde: serde_json::Value,
-    borrowed: serde_json_borrow::Value<'static>,
+    // borrowed: serde_json_borrow::Value<'static>,
 }
 
 impl Display for Value {
@@ -15,8 +15,11 @@ impl Display for Value {
 
 impl Value {
     pub fn new(serde: serde_json::Value) -> Self {
-        let borrowed = extend_lifetime(serde_json_borrow::Value::from(&serde));
-        Self { serde, borrowed }
+        // let borrowed = extend_lifetime(serde_json_borrow::Value::from(&serde));
+        Self {
+            serde,
+            // borrowed,
+        }
     }
     pub fn into_serde(self) -> serde_json::Value {
         self.serde
@@ -39,6 +42,6 @@ mod test {
         let val = json!({"key": "value"});
         let value = Value::new(val.clone());
         assert_eq!(value.serde(), &val);
-        assert_eq!(value.borrowed(), &serde_json_borrow::Value::from(&val));
+        // assert_eq!(value.borrowed(), &serde_json_borrow::Value::from(&val));
     }
 }
