@@ -8,7 +8,7 @@ pub struct EvalContext<'a> {
     pub request_ctx: &'a RequestContext,
 
     // graphql_ctx: &'a Ctx,
-    graphql_ctx_value: Option<Value>,
+    pub graphql_ctx_value: Option<Value>,
 
     graphql_ctx_args: Option<Value>,
 }
@@ -30,6 +30,18 @@ impl<'a> EvalContext<'a> {
     pub fn with_args(self, args: Value) -> Self {
         Self {
             graphql_ctx_args: Some(args),
+            ..self
+        }
+    }
+    pub fn clear_args(self) -> Self {
+        Self {
+            graphql_ctx_args: None,
+            ..self
+        }
+    }
+    pub fn clear_value(self) -> Self {
+        Self {
+            graphql_ctx_value: None,
             ..self
         }
     }

@@ -8,6 +8,7 @@ use crate::request_context::RequestContext;
 use crate::value::Value;
 use bytes::Bytes;
 use http_body_util::Full;
+use crate::jit::model::PathFinder;
 
 pub async fn handle_request(
     req: Request,
@@ -34,31 +35,14 @@ async fn handle_gql_req(
     let gql_req: async_graphql::Request = serde_json::from_slice(&request.body)?;
     let doc = async_graphql::parser::parse_query(&gql_req.query)?;
     let req_ctx = create_request_context(&app_ctx);
-    if let Some(query) = app_ctx.blueprint.schema.query.as_ref() {
-        let mut eval_ctx = EvalContext::new(&req_ctx);
-        let x = app_ctx.blueprint.fields.get(&FieldHash {
-            name: FieldName("post".to_string()),
-            id: TypeName(query.to_string()),
-        });
-        let x = x.as_ref().unwrap().ir.as_ref().unwrap();
-        let mut map = serde_json::Map::new();
-        let key = "id".to_string();
-        let val = serde_json::Value::Number(serde_json::Number::from(1));
-        map.insert(key, val);
-        eval_ctx = eval_ctx.with_args(Value::new(serde_json::Value::Object(map)));
-
-        let x = x.eval(&mut eval_ctx).await?;
-        println!("{}", x);
-        /*for (_,field) in app_ctx.blueprint.fields.iter() {
-            if let Some(ir) = field.ir.as_ref() {
-                println!("hx: {}", field.name.as_ref());
-                println!("{}", ir.eval(&mut eval_ctx).await?);
-            }else {
-                println!("hx1: {}", field.name.as_ref());
-            }
-        }*/
-        Ok(hyper::Response::new(Full::new(Bytes::from_static(
-            b"Printed",
+    if let Some(_) = app_ctx.blueprint.schema.query.as_ref() {
+        let eval_ctx = EvalContext::new(&req_ctx);
+        let path_finder = PathFinder::new(doc, &app_ctx.blueprint);
+        let fields = path_finder.exec().await;
+        let resolved = fields.resolve(eval_ctx).await?;
+        let finalized = resolved.finalize();
+        Ok(hyper::Response::new(Full::new(Bytes::from(
+            finalized.to_string(),
         ))))
     } else {
         Ok(hyper::Response::new(Full::new(Bytes::from_static(

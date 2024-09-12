@@ -48,6 +48,7 @@ futures-util = "0.3.30"
 http = "1.1.0"
 url = "2.5.2"
 schemars = {version = "0.8.17", features = ["derive"]}
+async-recursion = "1.1.1"
 
 [dev-dependencies]
 http-cache = "0.18.0"

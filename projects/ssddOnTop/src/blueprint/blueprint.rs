@@ -14,6 +14,12 @@ pub struct FieldHash {
     pub id: TypeName,
 }
 
+impl FieldHash {
+    pub fn new(name: FieldName, id: TypeName) -> Self {
+        Self { name, id }
+    }
+}
+
 #[derive(Debug)]
 pub struct Blueprint {
     pub fields: HashMap<FieldHash, Field>,
