@@ -7,7 +7,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct Post {
     id: i32,
     #[serde(rename = "userId")]
@@ -71,6 +71,49 @@ impl Loader<i32> for UserLoader {
     }
 }
 
+struct PostsLoader {
+    client: Client,
+}
+
+#[async_trait::async_trait]
+impl Loader<i32> for PostsLoader {
+    type Value = Post;
+    type Error = Error;
+
+    async fn load(&self, keys: &[i32]) -> Result<HashMap<i32, Self::Value>, Self::Error> {
+        let futures = keys.iter().map(|&id| {
+            let client = self.client.clone();
+            async move {
+                let response = client
+                    .get(&format!("http://localhost:3000/posts/{}", id))
+                    .send()
+                    .await;
+
+                match response {
+                    Ok(res) => match res.json::<Post>().await {
+                        Ok(post) => Some((id, post)),
+                        Err(_) => None,
+                    },
+                    Err(_) => None,
+                }
+            }
+        });
+
+        let futures: Vec<_> = futures.collect();
+
+        let results = futures::future::join_all(futures).await;
+
+        let mut post_map = HashMap::new();
+        for result in results {
+            if let Some((id, post)) = result {
+                post_map.insert(id, post);
+            }
+        }
+
+        Ok(post_map)
+    }
+}
+
 struct QueryRoot;
 
 #[Object]
@@ -87,14 +130,11 @@ impl QueryRoot {
     }
 
     async fn post(&self, ctx: &Context<'_>, id: i32) -> async_graphql::Result<Post> {
-        let client = ctx.data::<Client>().unwrap();
-        let response = client
-            .get(&format!("http://localhost:3000/posts/{}", id))
-            .send()
+        let loader = ctx.data::<DataLoader<PostsLoader>>().unwrap();
+        loader
+            .load_one(id)
             .await?
-            .json::<Post>()
-            .await?;
-        Ok(response)
+            .ok_or_else(|| async_graphql::Error::new("Post not found"))
     }
 
     async fn users(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<User>> {
@@ -153,9 +193,17 @@ async fn main() -> std::io::Result<()> {
         tokio::spawn,
     );
 
+    let posts_loader = DataLoader::new(
+        PostsLoader {
+            client: client.clone(),
+        },
+        tokio::spawn,
+    );
+
     let schema = Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
         .data(client)
         .data(user_loader)
+        .data(posts_loader)
         .finish();
 
     HttpServer::new(move || {
