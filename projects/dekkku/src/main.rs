@@ -9,7 +9,6 @@ use rand::seq::SliceRandom;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
     sync::{Arc, RwLock},
     time::Duration,
 };
@@ -21,19 +20,89 @@ const BASE_URL: &str = "http://localhost:3000";
 const ALL_USERS: &str = "http://localhost:3000/users";
 const ALL_POSTS: &str = "http://localhost:3000/posts";
 
-struct Store {
-    posts: RwLock<HashMap<i32, Post>>,
-    users: RwLock<HashMap<i32, User>>,
+// can cache the POST and USER.
+#[derive(Default)]
+struct Cache {
+    posts: DashMap<i32, Post>,
+    users: DashMap<i32, User>,
     is_dirty: RwLock<bool>,
 }
 
-impl Default for Store {
-    fn default() -> Self {
-        Self {
-            posts: RwLock::new(HashMap::new()),
-            users: RwLock::new(HashMap::new()),
-            is_dirty: RwLock::new(false),
+impl Cache {
+    fn validate_user(&self, user: &User) {
+        if let Some(cached_user) = self.users.get(&user.id) {
+            if *cached_user != *user {
+                *self.is_dirty.write().unwrap() = true;
+            }
         }
+        self.users.insert(user.id, user.clone());
+    }
+
+    fn validate_users(&self, users: &[User]) {
+        if self.users.is_empty() {
+            return;
+        }
+
+        let mut rng = rand::thread_rng();
+        let selected_users: Vec<&User> = users.choose_multiple(&mut rng, 2).collect();
+        if selected_users.len() == 2 {
+            let are_users_same = selected_users.iter().all(|user| {
+                self.users
+                    .get(&user.id)
+                    .map_or(false, |cached_user| *cached_user == **user)
+            });
+
+            if !are_users_same {
+                *self.is_dirty.write().unwrap() = true;
+            }
+        }
+    }
+
+    fn validate_posts(&self, posts: &[Post]) {
+        if self.users.is_empty() {
+            // fill the cache with users.
+            let mut rng = rand::thread_rng();
+            let selected_posts: Vec<&Post> = posts.choose_multiple(&mut rng, 2).collect();
+            if selected_posts.len() == 2 {
+                for post in selected_posts {
+                    self.posts.insert(post.id, post.clone());
+                }
+            }
+        } else {
+            let mut cache_dirty = false;
+            for post in self.posts.iter() {
+                if let Some(new_post) = posts.iter().find(|p| p.id == post.id) {
+                    if *post != *new_post {
+                        cache_dirty = true;
+                        break;
+                    }
+                }
+            }
+
+            if cache_dirty {
+                *self.is_dirty.write().unwrap() = true;
+                self.posts.clear();
+            }
+        }
+    }
+
+    fn validate_post(&self, post: &Post) {
+        let mut are_posts_same = true;
+        if let Some(cached_post) = self.posts.get(&post.id) {
+            if *post != *cached_post {
+                are_posts_same = false;
+            }
+        }
+
+        if !are_posts_same {
+            // clean up the users.
+            self.users.clear();
+            *self.is_dirty.write().unwrap() = true;
+        }
+    }
+
+    fn should_fetch_users(&self, user_id: &i32) -> bool {
+        self.users.contains_key(user_id) && !*self.is_dirty.read().unwrap()
     }
 }
 
@@ -47,45 +116,10 @@ impl Query {
     ) -> std::result::Result<Vec<Post>, async_graphql::Error> {
         let http_client = ctx.data_unchecked::<Arc<RequestBatcher>>();
         let posts: Vec<Post> = http_client.request(ALL_POSTS).await?;
-        let store = ctx.data_unchecked::<Arc<Store>>();
 
-        let are_posts_same = {
-            let is_cache_empty = store.posts.read().unwrap().is_empty();
-            if is_cache_empty {
-                let mut rng = rand::thread_rng();
-                let selected_posts: Vec<&Post> = posts.choose_multiple(&mut rng, 2).collect();
-                if selected_posts.len() == 2 {
-                    let mut posts_writer = store.posts.write().unwrap();
-                    for post in selected_posts {
-                        posts_writer.insert(post.id, post.clone());
-                    }
-                }
-                false
-            } else {
-                let cached_posts: Vec<Post> =
-                    store.posts.read().unwrap().values().cloned().collect();
-                let mut posts_writer = store.posts.write().unwrap();
-                cached_posts.iter().all(|post| {
-                    if let Some(new_post) = posts.iter().find(|p| p.id == post.id) {
-                        if post != new_post {
-                            posts_writer.insert(new_post.id, new_post.clone());
-                            false
-                        } else {
-                            true
-                        }
-                    } else {
-                        false
-                    }
-                })
-            }
-        };
+        let cache = ctx.data_unchecked::<Arc<Cache>>();
+        cache.validate_posts(&posts);
 
-        if !are_posts_same {
-            // clean up the users.
-            store.users.write().unwrap().clear();
-        }
-
-        *store.is_dirty.write().unwrap() = !are_posts_same;
         Ok(posts)
     }
 
@@ -96,21 +130,12 @@ impl Query {
     ) -> std::result::Result<Option<Post>, async_graphql::Error> {
         let loader = ctx.data_unchecked::<DataLoader<PostLoader>>();
         let post = loader.load_one(id).await?;
+
         if let Some(actual_post) = post.as_ref() {
-            let store = ctx.data_unchecked::<Arc<Store>>();
-            let mut are_posts_same = true;
-            if let Some(cached_post) = store.posts.read().unwrap().get(&id) {
-                if actual_post != cached_post {
-                    *store.is_dirty.write().unwrap() = true;
-                    are_posts_same = false;
-                }
-            }
-            if !are_posts_same {
-                // clean up the users.
-                store.users.write().unwrap().clear();
-            }
-            store.posts.write().unwrap().insert(id, actual_post.clone());
+            let cache = ctx.data_unchecked::<Arc<Cache>>();
+            cache.validate_post(actual_post);
         }
+
         Ok(post)
     }
 
@@ -121,22 +146,8 @@ impl Query {
         let http_client = ctx.data_unchecked::<Arc<RequestBatcher>>();
         let users: Vec<User> = http_client.request(ALL_USERS).await?;
 
-        let store = ctx.data_unchecked::<Arc<Store>>();
-        let mut rng = rand::thread_rng();
-        let selected_users: Vec<&User> = users.choose_multiple(&mut rng, 2).collect();
-
-        if selected_users.len() == 2 {
-            let users_writer = store.users.read().unwrap();
-            let are_users_same = selected_users.iter().all(|user| {
-                users_writer
-                    .get(&user.id)
-                    .map_or(false, |cached_user| cached_user == *user)
-            });
-
-            if !are_users_same {
-                *store.is_dirty.write().unwrap() = true;
-            }
-        }
+        let cache = ctx.data_unchecked::<Arc<Cache>>();
+        cache.validate_users(&users);
 
         Ok(users)
     }
@@ -149,14 +160,10 @@ impl Query {
         let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
         let user = loader.load_one(id).await?;
         if let Some(actual_user) = &user {
-            let store = ctx.data_unchecked::<Arc<Store>>();
-            if let Some(cached_user) = store.users.read().unwrap().get(&id) {
-                if cached_user != actual_user {
-                    *store.is_dirty.write().unwrap() = true;
-                }
-            }
-            store.users.write().unwrap().insert(id, actual_user.clone());
+            let cache = ctx.data_unchecked::<Arc<Cache>>();
+            cache.validate_user(actual_user);
         }
+
         Ok(user)
     }
 }
@@ -178,27 +185,19 @@ impl Post {
         &self,
         ctx: &Context<'_>,
     ) -> std::result::Result<Option<User>, async_graphql::Error> {
-        let store = ctx.data_unchecked::<Arc<Store>>();
-        if !*store.is_dirty.read().unwrap()
-            && store.users.read().unwrap().contains_key(&self.user_id)
-        {
-            let user = store.users.read().unwrap().get(&self.user_id).cloned();
+        let cache = ctx.data_unchecked::<Arc<Cache>>();
+        if cache.should_fetch_users(&self.user_id) {
+            let user = cache
+                .users
+                .get(&self.user_id)
+                .map(|ref_multi| ref_multi.clone());
             Ok(user)
         } else {
             let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
             let user = loader.load_one(self.user_id).await?;
 
             if let Some(actual_user) = user.as_ref() {
-                if let Some(cached_user) = store.users.read().unwrap().get(&self.user_id) {
-                    if cached_user != actual_user {
-                        *store.is_dirty.write().unwrap() = true;
-                    }
-                }
-                store
-                    .users
-                    .write()
-                    .unwrap()
-                    .insert(self.user_id, actual_user.clone());
+                cache.validate_user(actual_user);
             }
             Ok(user)
         }
@@ -277,7 +276,6 @@ async fn fetch_with_retry(
     url: &str,
 ) -> std::result::Result<reqwest::Response, reqwest::Error> {
     let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(3); // Retry up to 3 times
-
     Retry::spawn(retry_strategy, || client.get(url).send()).await
 }
 
@@ -287,6 +285,7 @@ struct HttpClient {
 }
 
 impl HttpClient {
+    #[allow(dead_code)]
     fn new(client: Arc<Client>) -> Self {
         Self { client }
     }
@@ -359,7 +358,6 @@ impl RequestBatcher {
 
 fn create_schema() -> Schema<Query, EmptyMutation, EmptySubscription> {
     let client = Arc::new(Client::new());
-    let http_client = Arc::new(HttpClient::new(client.clone()));
     let batch_client = Arc::new(RequestBatcher::new(client.clone()));
 
     let user_loader = DataLoader::new(UserLoader(batch_client.clone()), tokio::spawn)
@@ -368,11 +366,10 @@ fn create_schema() -> Schema<Query, EmptyMutation, EmptySubscription> {
         .delay(Duration::from_millis(5));
 
     Schema::build(Query, EmptyMutation, EmptySubscription)
-        .data(http_client)
         .data(user_loader)
         .data(post_loader)
         .data(batch_client)
-        .data(Arc::new(Store::default()))
+        .data(Arc::new(Cache::default()))
         .finish()
 }
 
