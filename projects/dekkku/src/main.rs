@@ -197,10 +197,7 @@ impl Post {
     ) -> std::result::Result<Option<User>, async_graphql::Error> {
         let cache = ctx.data_unchecked::<Arc<Cache>>();
         if cache.should_fetch_users(&self.user_id) {
-            let user = cache
-                .users
-                .get(&self.user_id)
-                .map(|ref_multi| ref_multi.clone());
+            let user = cache.users.read().unwrap().get(&self.user_id).cloned();
             Ok(user)
         } else {
             let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
