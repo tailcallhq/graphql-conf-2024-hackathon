@@ -2,4 +2,4 @@
 
 set -e
 
-cargo run -p ssddOnTop #--release
+cargo run -p ssddOnTop --release

@@ -16,9 +16,6 @@ pub async fn handle(
     let user_id = user_id.0;
     match state.db.user(user_id) {
         Some(user) => Ok(Json(user).into_response()),
-        None => Err(AppError::NotFound(format!(
-            "User with id {} not found",
-            user_id
-        ))),
+        None => Err(AppError::NotFound(format!("User with id {} not found", user_id))),
     }
 }
