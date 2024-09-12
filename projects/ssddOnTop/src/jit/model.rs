@@ -52,7 +52,7 @@ impl<'a> Fields1<'a> {
                 value = Some(val);
             }
         }
-        if let Some(val) = value.clone(){
+        if let Some(val) = value{
             match (val.as_array(), val.as_object()) {
                 (_, Some(obj)) => {
                     // let mut ans = Map::new();
