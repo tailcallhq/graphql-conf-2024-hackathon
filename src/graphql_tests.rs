@@ -6,8 +6,9 @@ use reqwest::Method;
 use tracing::{error, info};
 
 use crate::{
-    introspection::Schema,
+    query_info::Schema,
     request::{MOCK_API_CLIENT, REFERENCE_GRAPHQL_CLIENT, TESTED_GRAPHQL_CLIENT},
+    type_info::Root,
 };
 
 use super::ROOT_DIR;
@@ -69,35 +70,88 @@ pub async fn run_graphql_tests() -> Result<()> {
     Ok(())
 }
 
+fn query_builder(type_name: &str) -> String {
+    format!(
+        r#"
+        {{
+          __type(name: "{}") {{
+            name
+            kind
+            fields {{
+              name
+              args {{
+                name
+              }}
+            }}
+          }}
+        }}
+        "#,
+        type_name
+    )
+}
+
 pub async fn run_introspection_query() -> Result<()> {
     info!("Run graphql introspection tests");
-    let test = include_str!("./introspection_query.graphql");
+    let query_info = include_str!("./query_info.graphql");
 
-    let actual: Schema = serde_json::from_value(TESTED_GRAPHQL_CLIENT.request(&test).await?)?;
-    let expected: Schema = serde_json::from_value(REFERENCE_GRAPHQL_CLIENT.request(&test).await?)?;
+    // check the root query is same or not.
+    let actual_value = TESTED_GRAPHQL_CLIENT.request(&query_info).await?;
+    let expected_value = REFERENCE_GRAPHQL_CLIENT.request(&query_info).await?;
 
-    println!("----------------------------------------------------");
-    println!("expected {:#?}", expected);
-    println!("actual {:#?}", actual);
-    println!("----------------------------------------------------");
-
+    let actual: Schema = serde_json::from_value(actual_value.clone())?;
+    let expected: Schema = serde_json::from_value(expected_value.clone())?;
     let differ = DiffLogger::new();
-    let difference = differ.diff(
-        &serde_json::to_value(expected)?,
-        &serde_json::to_value(actual)?,
-    );
-
-    if !difference.is_empty() {
-        error!(
-            "Actual response is not equal to expected
-    Note: left is expected response -> right is actual response"
+    if actual != expected {
+        let difference = differ.diff(
+            &serde_json::to_value(actual.clone())?,
+            &serde_json::to_value(expected.clone())?,
         );
+        error!("Query Operation type mismatch");
         println!("{}", difference);
-
-        return Err(anyhow!("Actual response is not equal to expected"));
+        return Err(anyhow!("Query Operation type mismatch"));
     }
 
-    info!("Execution of graphql tests finished");
+    for (actual, expected) in actual
+        .data
+        .schema
+        .query_type
+        .fields
+        .iter()
+        .zip(expected.data.schema.query_type.fields.iter())
+    {
+        let actual_op_type = match actual.field_type.get_name() {
+            Some(name) => name,
+            None => continue,
+        };
+
+        let expected_op_type = match expected.field_type.get_name() {
+            Some(name) => name,
+            None => continue,
+        };
+
+        let actual_op_type_query = query_builder(&actual_op_type);
+        let expected_op_type_query = query_builder(&expected_op_type);
+
+        let actual: Root =
+            serde_json::from_value(TESTED_GRAPHQL_CLIENT.request(&actual_op_type_query).await?)?;
+        let expected: Root = serde_json::from_value(
+            REFERENCE_GRAPHQL_CLIENT
+                .request(&expected_op_type_query)
+                .await?,
+        )?;
+
+        if actual != expected {
+            let difference = differ.diff(
+                &serde_json::to_value(actual)?,
+                &serde_json::to_value(expected)?,
+            );
+            error!("Type Defination mismatch");
+            println!("{}", difference);
+            return Err(anyhow!("Type Defination mismatch"));
+        }
+    }
+
+    info!("Execution of graphql schema validation finished");
 
     Ok(())
 }
