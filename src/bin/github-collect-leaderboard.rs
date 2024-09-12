@@ -1,4 +1,6 @@
-use anyhow::{bail, Context, Result};
+use std::convert::identity;
+
+use anyhow::{Context, Result};
 use octocrate::{APIConfig, GitHubAPI, PersonalAccessToken};
 use regex::Regex;
 use tokio::task::JoinSet;
@@ -36,7 +38,7 @@ async fn run() -> Result<()> {
         .into_iter()
         .filter(|pr| pr.labels.iter().any(|label| label.name == "ci: benchmark"));
 
-    let mut join_set: JoinSet<Result<Score>> = JoinSet::new();
+    let mut join_set: JoinSet<Result<Option<Score>>> = JoinSet::new();
 
     info!("Check score comments for every pr");
 
@@ -56,29 +58,32 @@ async fn run() -> Result<()> {
                 if comment.performed_via_github_app.is_some() {
                     if let Some(body) = comment.body {
                         if let Some(caps) = score_regex.captures(&body) {
-                            return Ok(Score {
+                            return Ok(Some(Score {
                                 author: format!(
                                     "_{}_",
                                     pr.user.context("Failed to resolve author")?.login
                                 ),
                                 score: caps[1].parse()?,
-                            });
+                            }));
                         }
                     }
                 }
             }
 
-            bail!("Failed to infer the score")
+            Ok(None)
         });
     }
 
     info!("Got scores");
 
-    let mut scores = join_set
+    let mut scores: Vec<_> = join_set
         .join_all()
         .await
         .into_iter()
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .filter_map(identity)
+        .collect();
 
     scores.push(Score {
         author: "**Tailcall**".to_owned(),
