@@ -10,6 +10,7 @@ use serde_json::Map;
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
+use serde_json_borrow::ObjectAsVec;
 
 pub struct PathFinder<'a> {
     doc: ExecutableDocument,
@@ -23,6 +24,75 @@ pub struct Fields {
 #[derive(Debug)]
 pub struct Fields1<'a> {
     fields: Vec<Field1<'a>>,
+}
+
+fn to_borrowed(val: &Value) -> serde_json_borrow::Value {
+    serde_json_borrow::Value::from(val.serde())
+}
+
+impl<'a> Fields1<'a> {
+    #[inline(always)]
+    pub fn finalize(&'a self) -> serde_json_borrow::Value<'a> {
+        let mut map = ObjectAsVec::new();
+        for field in self.fields.iter() {
+            let name = field.name;
+            let val = Self::finalize_inner(field, None, None);
+            map.insert(name, val);
+        }
+        let mut ans = ObjectAsVec::new();
+        ans.insert("data", serde_json_borrow::Value::Object(map));
+        // map.insert("data".to_string(), self.finalize_inner());
+        // serde_json::Value::Object(map)
+        serde_json_borrow::Value::Object(ans)
+    }
+    #[inline(always)]
+    fn finalize_inner(field: &'a Field1<'a>, mut value: Option<serde_json_borrow::Value<'a>>, index: Option<usize>) -> serde_json_borrow::Value<'a> {
+        if let Some(val) = &field.resolved {
+            if value.is_none() {
+                value = Some(val.clone());
+            }
+        }
+        if let Some(val) = value.clone(){
+            match (val.as_array(), val.as_object()) {
+                (_, Some(obj)) => {
+                    // let mut ans = Map::new();
+                    let mut ans = ObjectAsVec::new();
+
+                    if field.nested.is_empty() {
+                        let val = obj.get_key(field.name);
+                        let value = Self::finalize_inner(field, val.cloned(), index);
+                        ans.insert(field.name, value);
+                    } else {
+                        for child in field.nested.iter() {
+                            let child_name = child.name;
+                            let val = obj.get_key(child.name).cloned();
+                            let val = Self::finalize_inner(child, val, index);
+                            ans.insert(child_name, val);
+                        }
+                    }
+
+                    serde_json_borrow::Value::Object(ans)
+                }
+                (Some(arr), _) => {
+                    if let Some(index) = index {
+                        let val = arr.get(index).cloned();
+                        let val = Self::finalize_inner(field, val, None);
+                        val
+                    } else {
+                        let mut ans = vec![];
+                        for (i, val) in arr.iter().enumerate() {
+                            let val = Self::finalize_inner(field, Some(val.clone()), Some(i));
+                            ans.push(val);
+                        }
+                        serde_json_borrow::Value::Array(ans)
+                    }
+                }
+                _ => value.unwrap_or_default(),
+            }
+        } else {
+            serde_json_borrow::Value::Null
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -76,67 +146,6 @@ pub struct Field1<'a> {
     pub resolved: Option<serde_json_borrow::Value<'a>>,
 }
 impl Fields {
-    #[inline(always)]
-    pub fn finalize(self) -> serde_json::Value {
-        let mut map = Map::new();
-        for field in self.fields.iter() {
-            let name = field.name.as_str().to_string();
-            let val = Self::finalize_inner(field, None, None);
-            map.insert(name, val);
-        }
-        let mut ans = Map::new();
-        ans.insert("data".to_string(), serde_json::Value::Object(map));
-        // map.insert("data".to_string(), self.finalize_inner());
-        // serde_json::Value::Object(map)
-        serde_json::Value::Object(ans)
-    }
-    #[inline(always)]
-    fn finalize_inner<'a>(field: &'a Field, mut value: Option<&'a serde_json::Value>, index: Option<usize>) -> serde_json::Value {
-        if let Some(val) = &field.resolved {
-            if value.is_none() {
-                value = Some(val.serde());
-            }
-        }
-        if let Some(val) = value {
-            match (val.as_array(), val.as_object()) {
-                (_, Some(obj)) => {
-                    let mut ans = Map::new();
-
-                    if field.nested.is_empty() {
-                        let val = obj.get_key(field.name.as_str());
-                        let value = Self::finalize_inner(field, val, index);
-                        ans.insert(field.name.as_str().to_string(), value);
-                    } else {
-                        for child in field.nested.iter() {
-                            let child_name = child.name.as_str().to_string();
-                            let val = obj.get_key(child.name.as_str());
-                            let val = Self::finalize_inner(child, val, index);
-                            ans.insert(child_name, val);
-                        }
-                    }
-
-                    serde_json::Value::Object(ans)
-                }
-                (Some(arr), _) => {
-                    if let Some(index) = index {
-                        let val = arr.get(index);
-                        let val = Self::finalize_inner(field, val, None);
-                        val
-                    } else {
-                        let mut ans = vec![];
-                        for (i, val) in arr.iter().enumerate() {
-                            let val = Self::finalize_inner(field, Some(val), Some(i));
-                            ans.push(val);
-                        }
-                        serde_json::Value::Array(ans)
-                    }
-                }
-                _ => value.cloned().unwrap_or_default(),
-            }
-        } else {
-            serde_json::Value::Null
-        }
-    }
     #[inline(always)]
     pub async fn resolve<'a>(mut self, eval_context: EvalContext<'a>) -> anyhow::Result<Fields> {
         let mut ans = vec![];

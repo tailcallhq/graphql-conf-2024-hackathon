@@ -44,9 +44,9 @@ async fn handle_gql_req(
         let borrowed_fields = fields.to_borrowed();
 
         let resolved = fields.resolve(eval_ctx).await?;
-        let finalized = resolved.finalize();
+        let borrowed_val = resolved.to_borrowed();
         Ok(hyper::Response::new(Full::new(Bytes::from(
-            finalized.to_string(),
+            borrowed_val.finalize().to_string(),
         ))))
     } else {
         Ok(hyper::Response::new(Full::new(Bytes::from_static(
