@@ -133,14 +133,18 @@ impl Query {
         let loader = ctx.data_unchecked::<DataLoader<PostLoader>>();
         let mut post = loader.load_one(id).await?;
 
-        // fetch the user as well.
-        // check if post is changed or not, if posts aren't changed then
-        if let Some(post_ref) = post.as_mut() {
-            let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
-            let user = loader.load_one(post_ref.user_id).await?;
-            post_ref.user = user;
-        }
+        let should_query_user = ctx
+            .field()
+            .selection_set()
+            .any(|field| field.name() == "user");
 
+        if should_query_user {
+            if let Some(post_ref) = post.as_mut() {
+                let loader = ctx.data_unchecked::<DataLoader<UserLoader>>();
+                let user = loader.load_one(post_ref.user_id).await?;
+                post_ref.user = user;
+            }
+        }
         Ok(post)
     }
 
