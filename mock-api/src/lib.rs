@@ -14,7 +14,7 @@ pub struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         let db = Database::new();
-        let _ = db.reset().unwrap();
+        db.reset().unwrap();
         Self { db }
     }
 }

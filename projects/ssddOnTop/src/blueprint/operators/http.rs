@@ -5,18 +5,15 @@ use crate::endpoint::Endpoint;
 use crate::http::method::Method;
 use crate::http::RequestTemplate;
 use crate::ir::{IO, IR};
-use crate::mustache::model::Mustache;
 
 fn compile_http(config_module: &config::Config, http: &config::Http) -> anyhow::Result<IR> {
     let mut base_url = String::new();
     if let Some(base) = http.base_url.clone() {
         base_url = base;
+    } else if let Some(base) = config_module.upstream.base_url.clone() {
+        base_url = base;
     } else {
-        if let Some(base) = config_module.upstream.base_url.clone() {
-            base_url = base;
-        } else {
-            return Err(anyhow::anyhow!("No base URL defined"));
-        }
+        return Err(anyhow::anyhow!("No base URL defined"));
     }
     let mut base_url = base_url.trim_end_matches('/').to_owned();
     base_url.push_str(http.path.clone().as_str());

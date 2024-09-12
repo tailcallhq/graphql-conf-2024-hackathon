@@ -3,9 +3,9 @@ use std::str::FromStr;
 #[derive(Clone, Debug, Default)]
 pub struct HeaderMap(hyper::header::HeaderMap);
 
-impl Into<hyper::header::HeaderMap> for HeaderMap {
-    fn into(self) -> hyper::header::HeaderMap {
-        self.0
+impl From<HeaderMap> for hyper::header::HeaderMap {
+    fn from(val: HeaderMap) -> Self {
+        val.0
     }
 }
 

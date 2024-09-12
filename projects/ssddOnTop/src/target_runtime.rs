@@ -89,7 +89,7 @@ mod http {
                 client: client.build(),
             }
         }
-        pub async fn execute(&self, mut request: reqwest::Request) -> Result<Response<Bytes>> {
+        pub async fn execute(&self, request: reqwest::Request) -> Result<Response<Bytes>> {
             tracing::info!(
                 "{} {} {:?}",
                 request.method(),
@@ -100,12 +100,12 @@ mod http {
             let response = self.client.execute(request).await;
             tracing::debug!("response: {:?}", response);
 
-            Ok(Response::from_reqwest(
+            Response::from_reqwest(
                 response?
                     .error_for_status()
                     .map_err(|err| err.without_url())?,
             )
-            .await?)
+            .await
         }
     }
 }

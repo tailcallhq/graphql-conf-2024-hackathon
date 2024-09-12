@@ -10,10 +10,10 @@ pub fn to_definitions(config: &Config) -> anyhow::Result<Vec<Definition>> {
     let mut definitions = vec![];
     for (ty_name, ty) in config.types.iter() {
         let def =
-            to_object_type_definition(ty_name, ty, config).and_then(
+            to_object_type_definition(ty_name, ty, config).map(
                 |definition| match definition {
                     Definition::Object(_) => {
-                        Ok(definition)
+                        definition
                         /*if config.input_types().contains(ty_name) {
                             to_input_object_type_definition(object_type_definition)
                         } else if config.interface_types().contains(ty_name) {
@@ -22,7 +22,7 @@ pub fn to_definitions(config: &Config) -> anyhow::Result<Vec<Definition>> {
                             Ok(definition)
                         }*/
                     }
-                    _ => Ok(definition),
+                    _ => definition,
                 },
             )?;
         definitions.push(def);
@@ -104,11 +104,11 @@ fn update_args(
         .args
         .iter()
         .map(|(name, arg)| {
-            let arg = InputFieldDefinition {
+            
+            InputFieldDefinition {
                 name: name.clone(),
                 of_type: arg.type_of.clone(),
-            };
-            arg
+            }
         })
         .collect::<Vec<_>>();
 

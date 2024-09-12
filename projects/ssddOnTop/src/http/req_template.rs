@@ -7,7 +7,6 @@ use crate::mustache::model::{Mustache, Segment};
 use crate::path::{PathString, PathValue, ValueString};
 use crate::value::Value;
 use hyper::Method;
-use reqwest::header::HeaderValue;
 use std::borrow::Cow;
 use std::hash::{Hash, Hasher};
 use url::Url;

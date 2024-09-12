@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub async fn run() -> anyhow::Result<()> {
     let config_reader = ConfigReader::init();
-    let path = std::env::args().into_iter().collect::<Vec<_>>();
+    let path = std::env::args().collect::<Vec<_>>();
     let path = path.get(1).cloned().unwrap_or({
         let root = env!("CARGO_MANIFEST_DIR");
         format!("{}/schema/schema.graphql", root)

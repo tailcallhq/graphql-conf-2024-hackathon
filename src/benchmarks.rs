@@ -127,7 +127,7 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
         stats.insert(bench_name.to_string(), single_stats);
     }
 
-    let json_path = output_path.join(format!("stats.json"));
+    let json_path = output_path.join("stats.json");
 
     let mut file = fs::OpenOptions::new()
         .write(true)
@@ -139,7 +139,7 @@ pub async fn run_benchmarks(output_path: &Path) -> Result<()> {
     file.write_all(serde_json::to_string_pretty(&stats)?.as_bytes())
         .await?;
 
-    let score = output_path.join(format!("score.out"));
+    let score = output_path.join("score.out");
 
     let mut file = fs::OpenOptions::new()
         .write(true)
@@ -178,6 +178,39 @@ fn parse_u64(data: &str, re: Regex) -> anyhow::Result<u64> {
     } else {
         bail!("Failed to parse {:?}", re)
     }
+}
+
+fn extract_errors(data: &str) -> (u64, u64, u64, u64) {
+    let re = Regex::new(
+        r"Socket\s+errors:\s+connect\s+(\d+),\s+read\s+(\d+).\s+write\s+(\d+).\s+timeout\s+(\d+)",
+    )
+    .unwrap();
+    if let Some(caps) = re.captures(data) {
+        (
+            caps[1].parse().unwrap_or(0),
+            caps[2].parse().unwrap_or(0),
+            caps[3].parse().unwrap_or(0),
+            caps[4].parse().unwrap_or(0),
+        )
+    } else {
+        (0, 0, 0, 0)
+    }
+}
+
+fn check_errors(single_stats: &Stats) -> anyhow::Result<()> {
+    if single_stats.read_errors > 0 {
+        bail!("Execution failed because read_errors exist")
+    }
+
+    if single_stats.write_errors > 0 {
+        bail!("Execution failed because write_errors exist")
+    }
+
+    if single_stats.connect_errors > 0 {
+        bail!("Execution failed because connect_errors exist")
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -344,37 +377,4 @@ mod tests {
             assert_eq!(stats.score(&baseline).unwrap(), 361);
         }
     }
-}
-
-fn extract_errors(data: &str) -> (u64, u64, u64, u64) {
-    let re = Regex::new(
-        r"Socket\s+errors:\s+connect\s+(\d+),\s+read\s+(\d+).\s+write\s+(\d+).\s+timeout\s+(\d+)",
-    )
-    .unwrap();
-    if let Some(caps) = re.captures(data) {
-        (
-            caps[1].parse().unwrap_or(0),
-            caps[2].parse().unwrap_or(0),
-            caps[3].parse().unwrap_or(0),
-            caps[4].parse().unwrap_or(0),
-        )
-    } else {
-        (0, 0, 0, 0)
-    }
-}
-
-fn check_errors(single_stats: &Stats) -> anyhow::Result<()> {
-    if single_stats.read_errors > 0 {
-        bail!("Execution failed because read_errors exist")
-    }
-
-    if single_stats.write_errors > 0 {
-        bail!("Execution failed because write_errors exist")
-    }
-
-    if single_stats.connect_errors > 0 {
-        bail!("Execution failed because connect_errors exist")
-    }
-
-    Ok(())
 }

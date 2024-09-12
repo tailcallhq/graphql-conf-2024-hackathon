@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex, Weak};
 
-use crate::ir::IoId;
 use futures_util::Future;
 use tokio::sync::broadcast;
 

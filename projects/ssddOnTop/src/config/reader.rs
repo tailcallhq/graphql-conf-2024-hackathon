@@ -12,7 +12,7 @@ impl ConfigReader {
     pub fn read<T: AsRef<Path>>(&self, path: T) -> anyhow::Result<Config> {
         let sdl = std::fs::read_to_string(path)?;
         let doc = async_graphql::parser::parse_schema(sdl)?;
-        Ok(crate::from_doc::from_doc(doc)?)
+        crate::from_doc::from_doc(doc)
     }
 }
 

@@ -24,6 +24,12 @@ fn geo_add_fractional_part(val: &mut f64) {
     }
 }
 
+impl Default for Database {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Database {
     /// Initialize the database with random data
     pub fn new() -> Self {

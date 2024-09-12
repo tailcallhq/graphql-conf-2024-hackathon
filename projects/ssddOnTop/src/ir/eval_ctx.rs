@@ -1,7 +1,6 @@
 use crate::request_context::RequestContext;
 use crate::value::Value;
 use std::borrow::Cow;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct EvalContext<'a> {
@@ -42,7 +41,7 @@ impl<'a> EvalContext<'a> {
     pub fn path_value<T: AsRef<str>>(&self, path: &[T]) -> Option<Cow<'a, Value>> {
         // TODO: add unit tests for this
         if let Some(value) = self.graphql_ctx_value.as_ref() {
-            get_path_value(value, path).map(|a| Cow::Owned(a))
+            get_path_value(value, path).map(Cow::Owned)
         } else {
             Some(Cow::Owned(Value::new(serde_json::Value::Null)))
             // get_path_value(self.graphql_ctx.value()?, path).map(Cow::Borrowed)
@@ -50,7 +49,7 @@ impl<'a> EvalContext<'a> {
     }
 }
 
-pub fn get_path_value<'a, T: AsRef<str>>(input: &'a Value, path: &[T]) -> Option<Value> {
+pub fn get_path_value<T: AsRef<str>>(input: &Value, path: &[T]) -> Option<Value> {
     let mut value = Some(input.serde());
     for name in path {
         match value {

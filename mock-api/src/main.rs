@@ -59,7 +59,7 @@ async fn main() {
         .layer(axum::middleware::from_fn(
             // This middleware is responsible to apply the delay functionality
             move |request: Request, next: Next| {
-                let delay = delay.clone();
+                let delay = delay;
                 async move {
                     let response = next.run(request).await;
                     tokio::time::sleep(delay).await;

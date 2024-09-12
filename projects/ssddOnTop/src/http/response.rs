@@ -5,7 +5,6 @@ use derive_setters::Setters;
 use http::StatusCode;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Bytes;
-use indexmap::IndexMap;
 
 #[derive(Clone, Debug, Default, Setters)]
 pub struct Response<Body> {

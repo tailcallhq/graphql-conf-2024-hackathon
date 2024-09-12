@@ -1,4 +1,3 @@
-use super::*;
 use crate::mustache::model::{Mustache, Segment};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};

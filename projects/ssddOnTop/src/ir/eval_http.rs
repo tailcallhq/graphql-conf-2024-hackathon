@@ -2,7 +2,6 @@ use crate::http::response::Response;
 use crate::http::RequestTemplate;
 use crate::ir::eval_ctx::EvalContext;
 use crate::value::Value;
-use bytes::Bytes;
 use reqwest::Request;
 
 pub struct EvalHttp<'a, 'ctx> {
@@ -21,7 +20,7 @@ impl<'a, 'ctx> EvalHttp<'a, 'ctx> {
         }
     }
     pub fn init_request(&self) -> anyhow::Result<Request> {
-        Ok(self.request_template.to_request(self.evaluation_ctx)?)
+        self.request_template.to_request(self.evaluation_ctx)
     }
 
     pub async fn execute(&self, req: Request) -> anyhow::Result<Response<Value>> {

@@ -6,4 +6,3 @@ mod url_query;
 pub use config::*;
 pub use kv::*;
 pub use reader::*;
-pub use url_query::*;

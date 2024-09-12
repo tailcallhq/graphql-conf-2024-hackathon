@@ -1,6 +1,6 @@
 use crate::app_ctx::AppCtx;
 use crate::blueprint::model::{FieldName, TypeName};
-use crate::blueprint::{Blueprint, FieldHash};
+use crate::blueprint::FieldHash;
 use crate::http::method::Method;
 use crate::http::request::Request;
 use crate::ir::eval_ctx::EvalContext;
@@ -8,8 +8,6 @@ use crate::request_context::RequestContext;
 use crate::value::Value;
 use bytes::Bytes;
 use http_body_util::Full;
-use std::ops::Deref;
-use std::sync::Arc;
 
 pub async fn handle_request(
     req: Request,

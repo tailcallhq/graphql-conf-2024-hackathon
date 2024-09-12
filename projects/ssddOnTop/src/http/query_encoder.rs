@@ -1,5 +1,4 @@
 use crate::path::ValueString;
-use crate::value::Value;
 
 /// Defines different strategies for encoding query parameters.
 #[derive(Default, Debug, Clone)]
