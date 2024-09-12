@@ -328,16 +328,31 @@ impl RequestBatcher {
 
             tokio::spawn(async move {
                 let result = fetch_with_retry(&client, &url).await;
+                let senders = on_going_req.remove(&url);
 
-                if let Ok(response) = result {
-                    if let Ok(body) = response.bytes().await {
-                        // let's say in queue, we've got around 10k requests and only one is executing right now.
-                        // and if it fails then we won't reach here to remove the all requests from queue
-                        // handle that scenario.
-                        let senders = { on_going_req.remove(&url) };
+                match result {
+                    Ok(response) => match response.bytes().await {
+                        Ok(body) => {
+                            if let Some((_, senders)) = senders {
+                                for sender in senders {
+                                    let _ = sender.send(Ok(body.clone()));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            if let Some((_, senders)) = senders {
+                                for sender in senders {
+                                    let err = anyhow::anyhow!(e.to_string());
+                                    let _ = sender.send(Err(err));
+                                }
+                            }
+                        }
+                    },
+                    Err(e) => {
                         if let Some((_, senders)) = senders {
                             for sender in senders {
-                                let _ = sender.send(Ok(body.clone()));
+                                let err = anyhow::anyhow!(e.to_string());
+                                let _ = sender.send(Err(err));
                             }
                         }
                     }
