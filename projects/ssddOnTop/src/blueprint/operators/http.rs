@@ -49,12 +49,10 @@ fn compile_http(config_module: &config::Config, http: &config::Http) -> anyhow::
         });
         IR::IO(IO::Http {
             req_template,
-            dl_id: None,
         })
     } else {
         IR::IO(IO::Http {
             req_template,
-            dl_id: None,
         })
     };
 

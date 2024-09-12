@@ -41,6 +41,8 @@ moka = { version = "0.12.7", default-features = false, features = [
     "future",
 ]}
 async-trait = "0.1.82"
+ttl_cache = "0.5.1"
+futures-util = "0.3.30"
 
 [dev-dependencies]
 http-cache = "0.18.0"

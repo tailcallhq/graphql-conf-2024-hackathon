@@ -12,5 +12,4 @@ impl AppCtx {
     pub fn new(runtime: TargetRuntime, blueprint: Arc<Blueprint>) -> Self {
         Self { runtime, blueprint }
     }
-
 }

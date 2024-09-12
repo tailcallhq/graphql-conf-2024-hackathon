@@ -1,5 +1,8 @@
 use crate::http;
 use std::num::NonZeroU64;
+use crate::ir::eval_ctx::EvalContext;
+use crate::ir::eval_io::eval_io;
+use crate::value::Value;
 // use crate::jit::eval_ctx::EvalContext;
 
 #[derive(Clone, Debug)]
@@ -44,14 +47,27 @@ impl IoId {
 pub enum IO {
     Http {
         req_template: http::RequestTemplate,
-        dl_id: Option<DataLoaderId>,
     },
 }
 
-/*impl<'a> IO {
-    fn cache_key(&self, ctx: &EvalContext<'a>) -> IoId {
+impl IR {
+    pub async fn eval<'a, 'b, Ctx>(
+        &'a self,
+        ctx: &'b mut EvalContext<'a>,
+    ) -> anyhow::Result<Value> {
+        match self {
+            IR::IO(io) => {
+                eval_io(io, ctx).await
+            }
+            IR::Cache(_) => todo!()
+        }
+    }
+}
+
+impl<'a> IO {
+    pub fn cache_key(&self, ctx: &EvalContext<'a>) -> IoId {
         match self {
             IO::Http { req_template, .. } => req_template.cache_key(ctx),
         }
     }
-}*/
+}

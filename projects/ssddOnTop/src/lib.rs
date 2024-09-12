@@ -15,6 +15,9 @@ mod value;
 mod target_runtime;
 mod cache;
 mod app_ctx;
+mod request_context;
+mod jit;
+mod dl;
 
 pub fn is_default<T: Default + Eq>(val: &T) -> bool {
     *val == T::default()

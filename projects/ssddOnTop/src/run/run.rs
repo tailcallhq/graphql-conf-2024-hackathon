@@ -1,6 +1,9 @@
+use std::sync::Arc;
+use crate::app_ctx::AppCtx;
 use crate::blueprint::Blueprint;
 use crate::config::ConfigReader;
 use crate::run;
+use crate::target_runtime::TargetRuntime;
 
 pub async fn run() -> anyhow::Result<()> {
     let config_reader = ConfigReader::init();
@@ -11,7 +14,10 @@ pub async fn run() -> anyhow::Result<()> {
     });
 
     let config = config_reader.read(path)?;
+
     let blueprint = Blueprint::try_from(&config)?;
-    run::http1::start(blueprint).await?;
+    let rt = TargetRuntime::new(&blueprint.upstream);
+    let app_ctx = AppCtx::new(rt, Arc::new(blueprint));
+    run::http1::start(app_ctx).await?;
     Ok(())
 }

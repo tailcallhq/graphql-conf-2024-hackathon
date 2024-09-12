@@ -1,7 +1,7 @@
 use crate::blueprint::definitions::to_definitions;
 use crate::blueprint::model::{Arg, ArgId, Field, FieldId, FieldName, TypeName};
 use crate::blueprint::wrapping_type::Type;
-use crate::config::Config;
+use crate::config::{Config, RootSchema};
 use crate::ir::IR;
 use derive_setters::Setters;
 use serde_json::Value;
@@ -19,6 +19,7 @@ pub struct Blueprint {
     pub fields: HashMap<FieldHash, Field>,
     pub server: Server,
     pub upstream: Upstream,
+    pub schema: RootSchema,
 }
 
 #[derive(Clone, Debug)]
@@ -74,12 +75,21 @@ pub struct Server {
     pub port: u16,
 }
 
+impl Default for Server {
+    fn default() -> Self {
+        Self {
+            host: IpAddr::from([127, 0, 0, 1]),
+            port: 8000,
+        }
+    }
+}
+
 impl Server {
     pub fn addr(&self) -> SocketAddr {
         SocketAddr::new(self.host, self.port)
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Upstream {
     pub base_url: Option<String>,
     pub http_cache: u64,
@@ -110,6 +120,7 @@ impl TryFrom<&Config> for Blueprint {
             fields,
             server,
             upstream,
+            schema: config.schema.clone(),
         })
     }
 }

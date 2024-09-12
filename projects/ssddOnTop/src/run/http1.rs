@@ -5,33 +5,33 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
+use crate::app_ctx::AppCtx;
 
-pub async fn start(blueprint: Blueprint) -> anyhow::Result<()> {
-    let blueprint = Arc::new(blueprint);
-    let addr = blueprint.server.addr();
+pub async fn start(app_ctx: AppCtx) -> anyhow::Result<()> {
+    let addr = app_ctx.blueprint.server.addr();
     let listener = TcpListener::bind(addr).await?;
 
     tracing::info!("Listening on: http://{}", addr);
     loop {
-        let blueprint = blueprint.clone();
+        let app_ctx = app_ctx.clone();
 
         let stream_result = listener.accept().await;
         match stream_result {
             Ok((stream, _)) => {
                 let io = hyper_util::rt::TokioIo::new(stream);
                 tokio::spawn(async move {
-                    let blueprint = blueprint.clone();
+                    let app_ctx = app_ctx.clone();
 
                     let server = hyper::server::conn::http1::Builder::new()
                         .serve_connection(
                             io,
                             service_fn(move |req| {
-                                let blueprint = blueprint.clone();
+                                let app_ctx = app_ctx.clone();
 
                                 async move {
                                     let req =
                                         crate::http::request::Request::from_hyper(req).await?;
-                                    handle_request(req, blueprint).await
+                                    handle_request(req, app_ctx).await
                                 }
                             }),
                         )

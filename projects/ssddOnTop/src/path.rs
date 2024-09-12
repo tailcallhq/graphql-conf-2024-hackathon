@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
 use serde_json::json;
-
-// use crate::jit::eval_ctx::EvalContext;
+use crate::ir::eval_ctx::EvalContext;
 use crate::json::JsonLike;
+use crate::value::Value;
 
 ///
 /// The path module provides a trait for accessing values from a JSON-like
@@ -40,18 +40,31 @@ impl PathString for serde_json::Value {
     }
 }
 
-fn convert_value(value: Cow<'_, async_graphql::Value>) -> Option<Cow<'_, str>> {
+fn convert_value(value: Cow<'_, Value>) -> Option<Cow<'_, str>> {
+    // let value = value.serde();
     match value {
-        Cow::Owned(async_graphql::Value::String(s)) => Some(Cow::Owned(s)),
-        Cow::Owned(async_graphql::Value::Number(n)) => Some(Cow::Owned(n.to_string())),
-        Cow::Owned(async_graphql::Value::Boolean(b)) => Some(Cow::Owned(b.to_string())),
-        Cow::Owned(async_graphql::Value::Object(map)) => Some(json!(map).to_string().into()),
-        Cow::Owned(async_graphql::Value::List(list)) => Some(json!(list).to_string().into()),
-        Cow::Borrowed(async_graphql::Value::String(s)) => Some(Cow::Borrowed(s.as_str())),
-        Cow::Borrowed(async_graphql::Value::Number(n)) => Some(Cow::Owned(n.to_string())),
-        Cow::Borrowed(async_graphql::Value::Boolean(b)) => Some(Cow::Owned(b.to_string())),
-        Cow::Borrowed(async_graphql::Value::Object(map)) => Some(json!(map).to_string().into()),
-        Cow::Borrowed(async_graphql::Value::List(list)) => Some(json!(list).to_string().into()),
+        Cow::Owned(val) => {
+            let val = val.into_serde();
+            match val {
+                serde_json::Value::String(s) => Some(Cow::Owned(s)),
+                serde_json::Value::Number(n) => Some(Cow::Owned(n.to_string())),
+                serde_json::Value::Bool(b) => Some(Cow::Owned(b.to_string())),
+                serde_json::Value::Object(map) => Some(json!(map).to_string().into()),
+                serde_json::Value::Array(list) => Some(json!(list).to_string().into()),
+                _ => None,
+            }
+        },
+        Cow::Borrowed(val) => {
+            let val = val.serde();
+            match val {
+                serde_json::Value::String(s) => Some(Cow::Borrowed(s)),
+                serde_json::Value::Number(n) => Some(Cow::Owned(n.to_string())),
+                serde_json::Value::Bool(b) => Some(Cow::Owned(b.to_string())),
+                serde_json::Value::Object(map) => Some(json!(map).to_string().into()),
+                serde_json::Value::Array(list) => Some(json!(list).to_string().into()),
+                _ => None,
+            }
+        },
         _ => None,
     }
 }
@@ -59,13 +72,13 @@ fn convert_value(value: Cow<'_, async_graphql::Value>) -> Option<Cow<'_, str>> {
 ///
 /// An optimized version of async_graphql::Value that handles strings in a more
 /// efficient manner.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub enum ValueString<'a> {
-    Value(Cow<'a, async_graphql::Value>),
+    Value(Cow<'a, Value>),
     String(Cow<'a, str>),
 }
 
-/*impl<'a> EvalContext<'a> {
+impl<'a> EvalContext<'a> {
     fn to_raw_value<T: AsRef<str>>(&self, path: &[T]) -> Option<ValueString<'_>> {
         let ctx = self;
 
@@ -77,9 +90,9 @@ pub enum ValueString<'a> {
             return match path[0].as_ref() {
                 "value" => Some(ValueString::Value(ctx.path_value(&[] as &[T])?)),
                 "args" => Some(ValueString::Value(ctx.path_arg::<&str>(&[])?)),
-                "vars" => Some(ValueString::String(Cow::Owned(
+               /* "vars" => Some(ValueString::String(Cow::Owned(
                     json!(ctx.vars()).to_string(),
-                ))),
+                ))),*/
                 _ => None,
             };
         }
@@ -88,13 +101,13 @@ pub enum ValueString<'a> {
             .and_then(move |(head, tail)| match head.as_ref() {
                 "value" => Some(ValueString::Value(ctx.path_value(tail)?)),
                 "args" => Some(ValueString::Value(ctx.path_arg(tail)?)),
-                "headers" => Some(ValueString::String(Cow::Borrowed(
+           /*     "headers" => Some(ValueString::String(Cow::Borrowed(
                     ctx.header(tail[0].as_ref())?,
                 ))),
                 "vars" => Some(ValueString::String(Cow::Borrowed(
                     ctx.var(tail[0].as_ref())?,
-                ))),
-                "env" => Some(ValueString::String(ctx.env_var(tail[0].as_ref())?)),
+                ))),*/
+                // "env" => Some(ValueString::String(ctx.env_var(tail[0].as_ref())?)),
                 _ => None,
             })
     }
@@ -126,7 +139,7 @@ impl<'a> PathGraphql for EvalContext<'a> {
             ValueString::String(val) => format!(r#""{val}""#),
         })
     }
-}*/
+}
 
 /*#[cfg(test)]
 mod tests {

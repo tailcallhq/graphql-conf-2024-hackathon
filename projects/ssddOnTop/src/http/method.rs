@@ -33,6 +33,19 @@ impl From<hyper::Method> for Method {
 }
 
 impl Method {
+    pub fn into_reqwest(self) -> reqwest::Method {
+        match self {
+            Method::GET => reqwest::Method::GET,
+            Method::POST => reqwest::Method::POST,
+            Method::PUT => reqwest::Method::PUT,
+            Method::PATCH => reqwest::Method::PATCH,
+            Method::DELETE => reqwest::Method::DELETE,
+            Method::HEAD => reqwest::Method::HEAD,
+            Method::OPTIONS => reqwest::Method::OPTIONS,
+            Method::CONNECT => reqwest::Method::CONNECT,
+            Method::TRACE => reqwest::Method::TRACE,
+        }
+    }
     pub fn to_hyper(self) -> hyper::Method {
         match self {
             Method::GET => hyper::Method::GET,

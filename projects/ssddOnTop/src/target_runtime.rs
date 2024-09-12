@@ -1,93 +1,76 @@
-use std::sync::Arc;
-use crate::target_runtime::cache::HttpCacheManager;
 use crate::target_runtime::http::NativeHttp;
+use std::sync::Arc;
+use crate::blueprint::Upstream;
+use crate::ir::IoId;
+use crate::value::Value;
 
 #[derive(Clone)]
 pub struct TargetRuntime {
     /// HTTP client for making standard HTTP requests.
     pub http: Arc<NativeHttp>,
-    pub cache: Arc<HttpCacheManager>,
+    pub cache: Arc<cache::InMemoryCache<IoId, Value>>,
+}
+
+impl TargetRuntime {
+    pub fn new(upstream: &Upstream) -> Self {
+        let http = Arc::new(NativeHttp::init(upstream));
+        let cache = Arc::new(cache::InMemoryCache::new());
+        Self { http, cache }
+    }
 }
 
 mod cache {
-    use http_cache_reqwest::{CacheManager, HttpResponse};
-    use http_cache_semantics::CachePolicy;
-    use serde::{Deserialize, Serialize};
-    pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
-    pub type Result<T> = std::result::Result<T, BoxError>;
-    use std::sync::Arc;
+    use std::hash::Hash;
+    use std::num::NonZeroU64;
+    use std::sync::{Arc, RwLock};
+    use std::time::Duration;
 
-    use moka::future::Cache;
-    use moka::policy::EvictionPolicy;
+    use ttl_cache::TtlCache;
+    use crate::value::ToInner;
 
-    pub struct HttpCacheManager {
-        pub cache: Arc<Cache<String, Store>>,
+    pub struct InMemoryCache<K: Hash + Eq, V> {
+        data: Arc<RwLock<TtlCache<K, V>>>,
     }
 
-    impl Default for HttpCacheManager {
+    const CACHE_CAPACITY: usize = 100000;
+
+    impl<K: Hash + Eq, V: Clone> Default for InMemoryCache<K, V> {
         fn default() -> Self {
-            Self::new(42)
+            Self::new()
         }
     }
 
-    #[derive(Clone, Deserialize, Serialize)]
-    pub struct Store {
-        response: HttpResponse,
-        policy: CachePolicy,
+    impl<K: Hash + Eq, V: Clone> InMemoryCache<K, V> {
+        pub fn new() -> Self {
+            InMemoryCache {
+                data: Arc::new(RwLock::new(TtlCache::new(CACHE_CAPACITY))),
+            }
+        }
     }
 
-    impl HttpCacheManager {
-        pub fn new(cache_size: u64) -> Self {
-            let cache = Cache::builder()
-                .eviction_policy(EvictionPolicy::lru())
-                .max_capacity(cache_size)
-                .build();
-            Self { cache: Arc::new(cache) }
-        }
-
-        pub async fn clear(&self) -> Result<()> {
-            self.cache.invalidate_all();
-            self.cache.run_pending_tasks().await;
+    impl<K: Hash + Eq + Send + Sync, V: Send + Sync + ToInner<Inner=Inner>, Inner: Clone> InMemoryCache<K, V> {
+        pub async fn set<'a>(&'a self, key: K, value: V, ttl: NonZeroU64) -> anyhow::Result<()> {
+            let ttl = Duration::from_millis(ttl.get());
+            self.data.write().unwrap().insert(key, value, ttl);
             Ok(())
         }
-    }
 
-    #[async_trait::async_trait]
-    impl CacheManager for HttpCacheManager {
-        async fn get(&self, cache_key: &str) -> Result<Option<(HttpResponse, CachePolicy)>> {
-            let store: Store = match self.cache.get(cache_key).await {
-                Some(d) => d,
-                None => return Ok(None),
-            };
-            Ok(Some((store.response, store.policy)))
-        }
-
-        async fn put(
-            &self,
-            cache_key: String,
-            response: HttpResponse,
-            policy: CachePolicy,
-        ) -> Result<HttpResponse> {
-            let data = Store { response: response.clone(), policy };
-            self.cache.insert(cache_key, data).await;
-            self.cache.run_pending_tasks().await;
-            Ok(response)
-        }
-
-        async fn delete(&self, cache_key: &str) -> Result<()> {
-            self.cache.invalidate(cache_key).await;
-            self.cache.run_pending_tasks().await;
-            Ok(())
+        pub async fn get<'a>(&'a self, key: &'a K) -> anyhow::Result<Option<Inner>> {
+            let val = self.data.read().unwrap().get(key).map(|v| v.to_inner());
+            Ok(val)
         }
     }
 }
 
 mod http {
+    use bytes::Bytes;
+    use crate::blueprint::Upstream;
+    use crate::cache::HttpCacheManager;
     use http_cache_reqwest::{Cache, CacheMode, HttpCache, HttpCacheOptions};
     use reqwest::Client;
     use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-    use crate::blueprint::Upstream;
-    use crate::cache::HttpCacheManager;
+    use crate::http::response::Response;
+    use anyhow::Result;
 
     pub struct NativeHttp {
         client: ClientWithMiddleware,
@@ -106,6 +89,24 @@ mod http {
             Self {
                 client: client.build(),
             }
+        }
+        pub async fn execute(&self, mut request: reqwest::Request) -> Result<Response<Bytes>> {
+            tracing::info!(
+            "{} {} {:?}",
+            request.method(),
+            request.url(),
+            request.version()
+        );
+            tracing::debug!("request: {:?}", request);
+            let response = self.client.execute(request).await;
+            tracing::debug!("response: {:?}", response);
+
+            Ok(Response::from_reqwest(
+                response?
+                    .error_for_status()
+                    .map_err(|err| err.without_url())?,
+            )
+                .await?)
         }
     }
 }
