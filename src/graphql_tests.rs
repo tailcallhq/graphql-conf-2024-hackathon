@@ -3,6 +3,8 @@ use std::{fs, sync::LazyLock};
 use anyhow::{anyhow, Result};
 use diff_logger::DiffLogger;
 use reqwest::Method;
+use serde::{de::DeserializeOwned, Serialize};
+use serde_json::Value;
 use tracing::{error, info};
 
 use crate::{
@@ -90,6 +92,31 @@ fn query_builder(type_name: &str) -> String {
     )
 }
 
+fn compare<T: DeserializeOwned + Serialize + Clone>(
+    actual: Value,
+    expected: Value,
+    error_message: &str,
+) -> Result<()> {
+    // in order to have sorting.
+    let actual: T = serde_json::from_value(actual)?;
+    let expected: T = serde_json::from_value(expected)?;
+
+    // with value we can compare with diff logger
+    let actual_value = serde_json::to_value(actual)?;
+    let expected_value = serde_json::to_value(expected)?;
+
+    let differ = DiffLogger::new();
+
+    let difference = differ.diff(&actual_value, &expected_value);
+    if !difference.is_empty() {
+        error!(error_message);
+        println!("{}", difference);
+        return Err(anyhow!(error_message.to_owned()));
+    }
+
+    Ok(())
+}
+
 pub async fn run_introspection_query() -> Result<()> {
     info!("Run graphql introspection tests");
     let query_info = include_str!("./query_info.graphql");
@@ -97,19 +124,14 @@ pub async fn run_introspection_query() -> Result<()> {
     // check the root query is same or not.
     let actual_value = TESTED_GRAPHQL_CLIENT.request(&query_info).await?;
     let expected_value = REFERENCE_GRAPHQL_CLIENT.request(&query_info).await?;
-
     let actual: Schema = serde_json::from_value(actual_value.clone())?;
     let expected: Schema = serde_json::from_value(expected_value.clone())?;
-    let differ = DiffLogger::new();
-    if actual != expected {
-        let difference = differ.diff(
-            &serde_json::to_value(actual.clone())?,
-            &serde_json::to_value(expected.clone())?,
-        );
-        error!("Query Operation type mismatch");
-        println!("{}", difference);
-        return Err(anyhow!("Query Operation type mismatch"));
-    }
+
+    let _ = compare::<Schema>(
+        actual_value,
+        expected_value,
+        "Query Operation type mismatch",
+    )?;
 
     for (actual, expected) in actual
         .data
@@ -119,36 +141,26 @@ pub async fn run_introspection_query() -> Result<()> {
         .iter()
         .zip(expected.data.schema.query_type.fields.iter())
     {
-        let actual_op_type = match actual.field_type.get_name() {
-            Some(name) => name,
-            None => continue,
-        };
+        let actual_op_type = actual.field_type.get_name();
+        let expected_op_type = expected.field_type.get_name();
 
-        let expected_op_type = match expected.field_type.get_name() {
-            Some(name) => name,
-            None => continue,
-        };
+        if actual_op_type.is_none() != expected_op_type.is_none() {
+            error!("Output type mismatch for field: {:?}", actual.name);
+            return Err(anyhow!("Output type mismatch for field: {:?}", actual.name));
+        }
+
+        let actual_op_type = actual_op_type.unwrap();
+        let expected_op_type = expected_op_type.unwrap();
 
         let actual_op_type_query = query_builder(&actual_op_type);
         let expected_op_type_query = query_builder(&expected_op_type);
 
-        let actual: Root =
-            serde_json::from_value(TESTED_GRAPHQL_CLIENT.request(&actual_op_type_query).await?)?;
-        let expected: Root = serde_json::from_value(
-            REFERENCE_GRAPHQL_CLIENT
-                .request(&expected_op_type_query)
-                .await?,
-        )?;
+        let actual = TESTED_GRAPHQL_CLIENT.request(&actual_op_type_query).await?;
+        let expected = REFERENCE_GRAPHQL_CLIENT
+            .request(&expected_op_type_query)
+            .await?;
 
-        if actual != expected {
-            let difference = differ.diff(
-                &serde_json::to_value(actual)?,
-                &serde_json::to_value(expected)?,
-            );
-            error!("Type Defination mismatch");
-            println!("{}", difference);
-            return Err(anyhow!("Type Defination mismatch"));
-        }
+        let _ = compare::<Root>(actual, expected, "Type Defination mismatch")?;
     }
 
     info!("Execution of graphql schema validation finished");
