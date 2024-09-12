@@ -41,9 +41,9 @@ pub async fn run_graphql_tests() -> Result<()> {
         MOCK_API_CLIENT.request(Method::POST, "reset").await?;
 
         for test in tests {
-            let actual = TESTED_GRAPHQL_CLIENT.request(test).await?;
+            let actual = TESTED_GRAPHQL_CLIENT.request(&test).await?;
 
-            let expected = REFERENCE_GRAPHQL_CLIENT.request(test).await?;
+            let expected = REFERENCE_GRAPHQL_CLIENT.request(&test).await?;
 
             let differ = DiffLogger::new();
 

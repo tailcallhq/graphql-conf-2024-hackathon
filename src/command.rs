@@ -47,7 +47,7 @@ impl Command {
 
         let mut command = tokio::process::Command::new(cmd_path);
 
-        command.current_dir(cmd_path.parent().unwrap_or(cmd_path));
+        command.current_dir(&cmd_path.parent().unwrap_or(cmd_path));
 
         Ok(Self { command })
     }
