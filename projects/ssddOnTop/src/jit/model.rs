@@ -46,10 +46,10 @@ impl<'a> Fields1<'a> {
         serde_json_borrow::Value::Object(ans)
     }
     #[inline(always)]
-    fn finalize_inner(field: &'a Field1<'a>, mut value: Option<serde_json_borrow::Value<'a>>, index: Option<usize>) -> serde_json_borrow::Value<'a> {
+    fn finalize_inner(field: &'a Field1<'a>, mut value: Option<&'a serde_json_borrow::Value<'a>>, index: Option<usize>) -> serde_json_borrow::Value<'a> {
         if let Some(val) = &field.resolved {
             if value.is_none() {
-                value = Some(val.clone());
+                value = Some(val);
             }
         }
         if let Some(val) = value.clone(){
@@ -60,12 +60,12 @@ impl<'a> Fields1<'a> {
 
                     if field.nested.is_empty() {
                         let val = obj.get_key(field.name);
-                        let value = Self::finalize_inner(field, val.cloned(), index);
+                        let value = Self::finalize_inner(field, val, index);
                         ans.insert(field.name, value);
                     } else {
                         for child in field.nested.iter() {
                             let child_name = child.name;
-                            let val = obj.get_key(child.name).cloned();
+                            let val = obj.get_key(child.name);
                             let val = Self::finalize_inner(child, val, index);
                             ans.insert(child_name, val);
                         }
@@ -75,19 +75,19 @@ impl<'a> Fields1<'a> {
                 }
                 (Some(arr), _) => {
                     if let Some(index) = index {
-                        let val = arr.get(index).cloned();
+                        let val = arr.get(index);
                         let val = Self::finalize_inner(field, val, None);
                         val
                     } else {
                         let mut ans = vec![];
                         for (i, val) in arr.iter().enumerate() {
-                            let val = Self::finalize_inner(field, Some(val.clone()), Some(i));
+                            let val = Self::finalize_inner(field, Some(val), Some(i));
                             ans.push(val);
                         }
                         serde_json_borrow::Value::Array(ans)
                     }
                 }
-                _ => value.unwrap_or_default(),
+                _ => value.cloned().unwrap_or_default(),
             }
         } else {
             serde_json_borrow::Value::Null
@@ -162,25 +162,25 @@ impl Fields {
             for mut field in fields {
                 let mut parent_val = None;
 
-                if let Some(ir) = field.ir.clone() {
+                if let Some(ir) = field.ir.as_ref() {
                     if let Some(val) = field.args.clone() {
                         eval_context = eval_context.with_args(val);
                     }
 
                     let val = match &parent {
                         Some(val) => {
-                            match val.clone().into_serde() {
+                            match val.serde() {
                                 serde_json::Value::Array(arr) => {
                                     let mut ans = vec![];
                                     for val in arr {
-                                        eval_context = eval_context.with_value(Value::new(val));
+                                        eval_context = eval_context.with_value(Value::new(val.clone()));
                                         let val = ir.eval(&mut eval_context.clone()).await?;
                                         ans.push(val.into_serde());
                                     }
                                     Some(Value::new(serde_json::Value::Array(ans)))
                                 }
                                 val => {
-                                    eval_context = eval_context.with_value(Value::new(val));
+                                    eval_context = eval_context.with_value(Value::new(val.clone()));
                                     let val = ir.eval(&mut eval_context.clone()).await?;
                                     Some(val)
                                 }
