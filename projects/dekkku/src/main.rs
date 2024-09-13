@@ -24,14 +24,14 @@ const ALL_POSTS: &str = "http://localhost:3000/posts";
 
 struct Store {
     posts: RwLock<HashMap<i32, Post>>,
-    users: RwLock<HashMap<i32, User>>,
+    users: DashMap<i32, User>,
 }
 
 impl Default for Store {
     fn default() -> Self {
         Self {
             posts: RwLock::new(HashMap::new()),
-            users: RwLock::new(HashMap::new()),
+            users: DashMap::default(),
         }
     }
 }
@@ -87,9 +87,8 @@ impl Query {
 
             if are_posts_same {
                 // Posts are the same, load the data from store and update the posts' user property.
-                let store_users = store.users.read().unwrap();
                 for post in posts.iter_mut() {
-                    if let Some(cached_user) = store_users.get(&post.user_id) {
+                    if let Some(cached_user) = store.users.get(&post.user_id) {
                         post.user = Some(cached_user.clone());
                     }
                 }
@@ -112,11 +111,10 @@ impl Query {
                 //     .into_iter()
                 //     .map(|user| (user.id, user))
                 //     .collect::<HashMap<_, _>>();
-                let mut store_users = store.users.write().unwrap();
                 for post in posts.iter_mut() {
                     if let Some(user) = users.get(&post.user_id) {
                         post.user = Some(user.clone());
-                        store_users.insert(user.id, user.clone());
+                        store.users.insert(user.id, user.clone());
                     }
                 }
             }
