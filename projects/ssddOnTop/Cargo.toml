@@ -49,6 +49,7 @@ http = "1.1.0"
 url = "2.5.2"
 schemars = {version = "0.8.17", features = ["derive"]}
 async-recursion = "1.1.1"
+dashmap = "6.1.0"
 
 [dev-dependencies]
 http-cache = "0.18.0"
