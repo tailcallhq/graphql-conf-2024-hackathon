@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::app_ctx::AppCtx;
 use crate::blueprint::{Server, Upstream};
 use crate::ir::IoId;
@@ -8,6 +9,7 @@ use anyhow::Error;
 use derive_setters::Setters;
 use std::num::NonZeroU64;
 use std::sync::{Arc, Mutex};
+use dashmap::DashMap;
 
 #[derive(Clone)]
 pub struct CacheErr(String);
@@ -31,7 +33,8 @@ pub struct RequestContext {
     pub min_max_age: Arc<Mutex<Option<i32>>>,
     pub cache_public: Arc<Mutex<Option<bool>>>,
     pub runtime: TargetRuntime,
-    pub cache: InMemoryCache<IoId, Value>,
+    pub cache: DashMap<IoId, Value>,
+    // pub cache: InMemoryCache<IoId, Value>,
     // pub cache: Dedupe<IoId, Result<Value, CacheErr>>,
 }
 
@@ -44,7 +47,8 @@ impl RequestContext {
             cache_public: Arc::new(Mutex::new(None)),
             runtime: target_runtime,
             // cache: Dedupe::new(1, true),
-            cache: InMemoryCache::new(),
+            // cache: InMemoryCache::new(),
+            cache: Default::default(),
         }
     }
     fn set_min_max_age_conc(&self, min_max_age: i32) {
@@ -99,7 +103,8 @@ impl From<&AppCtx> for RequestContext {
             cache_public: Arc::new(Mutex::new(None)),
             runtime: app_ctx.runtime.clone(),
             // cache: Dedupe::new(1, true),
-            cache: InMemoryCache::new(),
+            // cache: InMemoryCache::new(),
+            cache: Default::default(),
         }
     }
 }

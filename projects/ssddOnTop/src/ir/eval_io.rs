@@ -6,20 +6,17 @@ use crate::value::Value;
 use std::num::NonZeroU64;
 
 pub async fn eval_io(io: &IO, ctx: &mut EvalContext<'_>) -> anyhow::Result<Value> {
-    let val = eval_io_inner(io, ctx).await?;
-    Ok(val)
-/*    let key = io.cache_key(ctx);
+    let key = io.cache_key(ctx);
 
-    if let Some(val) = ctx.request_ctx.cache.get(&key).await? {
-        Ok(val.clone())
+    if let Some(val) = ctx.request_ctx.cache.get(&key) {
+        Ok(val.value().clone())
     } else {
         let val = eval_io_inner(io, ctx).await?;
         ctx.request_ctx
             .cache
-            .set(key, val.clone(), NonZeroU64::MAX)
-            .await?;
+            .insert(key, val.clone());
         Ok(val)
-    }*/
+    }
 }
 
 async fn eval_io_inner(io: &IO, ctx: &mut EvalContext<'_>) -> Result<Value, CacheErr> {
